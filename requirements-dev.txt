@@ -1,2 +1,1 @@
--r requirements.txt
-pytest>=8.2.0
+# Dépendances de test optionnelles : installez pytest si vous ne l'avez pas déjà.

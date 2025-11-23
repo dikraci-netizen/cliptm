@@ -16,8 +16,8 @@ import logging
 from dataclasses import dataclass
 from typing import Callable, Iterable, List, Optional
 from urllib.parse import urljoin
+from urllib.request import Request, urlopen
 
-import requests
 from bs4 import BeautifulSoup
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
@@ -26,6 +26,8 @@ USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/120.0 Safari/537.36"
 )
+
+
 
 
 def _clean(text: str) -> str:
@@ -105,12 +107,21 @@ def render_html_table(postings: Iterable[JobPosting]) -> str:
     return html_doc
 
 
-def _fetch(session: requests.Session, url: str, timeout: float) -> BeautifulSoup:
+def _fetch(url: str, timeout: float) -> BeautifulSoup:
     logging.info("Fetching %s", url)
-    response = session.get(url, timeout=timeout)
-    if not response.ok:
-        raise ScraperError(f"Failed to fetch {url}: HTTP {response.status_code}")
-    return BeautifulSoup(response.text, "html.parser")
+    request = Request(url, headers={"User-Agent": USER_AGENT})
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            encoding = response.headers.get_content_charset() or "utf-8"
+            body = response.read().decode(encoding, errors="replace")
+            status = getattr(response, "status", 200)
+    except Exception as exc:  # noqa: BLE001 - surface HTTP/connection errors to the user
+        raise ScraperError(f"Failed to fetch {url}: {exc}") from exc
+
+    if status >= 400:
+        raise ScraperError(f"Failed to fetch {url}: HTTP {status}")
+
+    return BeautifulSoup(body, "html.parser")
 
 
 def parse_emploi_public(soup: BeautifulSoup, base_url: str, limit: Optional[int] = None) -> List[JobPosting]:
@@ -175,9 +186,9 @@ def parse_emploi_public(soup: BeautifulSoup, base_url: str, limit: Optional[int]
     return jobs
 
 
-def scrape_emploi_public(session: requests.Session, timeout: float, limit: Optional[int]) -> List[JobPosting]:
+def scrape_emploi_public(timeout: float, limit: Optional[int]) -> List[JobPosting]:
     url = "https://www.emploi-public.ma/index.php/fr/offres-emploi"
-    soup = _fetch(session, url, timeout)
+    soup = _fetch(url, timeout)
     return parse_emploi_public(soup, url, limit)
 
 
@@ -190,8 +201,10 @@ def parse_anapec(soup: BeautifulSoup, base_url: str, limit: Optional[int] = None
             continue
         title = _clean(anchor.get_text())
         apply_url = urljoin(base_url, anchor.get("href")) if anchor.get("href") else base_url
-        organization = _clean(card.select_one(".entreprise, .company").get_text()) if card.select_one(".entreprise, .company") else ""
-        location = _clean(card.select_one(".lieu, .location").get_text()) if card.select_one(".lieu, .location") else ""
+        organization_node = card.select_one(".entreprise, .company")
+        location_node = card.select_one(".lieu, .location")
+        organization = _clean(organization_node.get_text()) if organization_node else ""
+        location = _clean(location_node.get_text()) if location_node else ""
         published_text = card.select_one(".publie, .date")
         deadline_text = card.select_one(".deadline, .date-limit")
         published = _parse_date(published_text.get_text()) if published_text else None
@@ -239,23 +252,20 @@ def parse_anapec(soup: BeautifulSoup, base_url: str, limit: Optional[int] = None
     return jobs
 
 
-def scrape_anapec(session: requests.Session, timeout: float, limit: Optional[int]) -> List[JobPosting]:
+def scrape_anapec(timeout: float, limit: Optional[int]) -> List[JobPosting]:
     url = "https://www.anapec.org/sigec-app-rv/offre/list"
-    soup = _fetch(session, url, timeout)
+    soup = _fetch(url, timeout)
     return parse_anapec(soup, url, limit)
 
 
 def gather_postings(sources: Iterable[str], limit: Optional[int], timeout: float) -> List[JobPosting]:
-    session = requests.Session()
-    session.headers["User-Agent"] = USER_AGENT
-
     jobs: List[JobPosting] = []
     for source in sources:
         try:
             if source == "emploi-public":
-                jobs.extend(scrape_emploi_public(session, timeout, limit))
+                jobs.extend(scrape_emploi_public(timeout, limit))
             elif source == "anapec":
-                jobs.extend(scrape_anapec(session, timeout, limit))
+                jobs.extend(scrape_anapec(timeout, limit))
             else:
                 raise ValueError(f"Unsupported source '{source}'")
         except Exception as exc:  # noqa: BLE001 - top-level user feedback

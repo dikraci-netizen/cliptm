@@ -4,17 +4,13 @@ Ce dépôt fournit un script Python (`job_scraper.py`) qui interroge des sources
 
 ## Installation
 
-1. Installez les dépendances principales :
+Le script repose uniquement sur la bibliothèque standard Python : aucune
+installation de paquets n'est nécessaire pour l'exécuter ou pour utiliser les
+parseurs dans les tests.
 
-```bash
-python -m pip install -r requirements.txt
-```
-
-Pour exécuter la suite de tests, ajoutez les dépendances de développement :
-
-```bash
-python -m pip install -r requirements-dev.txt
-```
+> Astuce : si vous souhaitez exécuter la suite `pytest` mais n'avez pas Pytest
+> installé, vous pouvez l'ajouter avec `python -m pip install pytest` (ou votre
+> gestionnaire préféré).
 
 ## Utilisation
 
