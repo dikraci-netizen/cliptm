@@ -15,7 +15,7 @@
           <circle cx="12" cy="12" r="12" fill="#1877F2"/>
           <path d="M16.5 12.5h-2.5v7h-3v-7h-2v-2.5h2v-1.5c0-2.2 1-3.5 3.5-3.5h2v2.5h-1.5c-.8 0-1 .3-1 1v1.5h2.5l-.5 2.5z" fill="white"/>
         </svg>
-        <h1 data-i18n="appName">Auto Poster <span class="pro-badge" data-i18n="proBadge">PRO</span></h1>
+        <h1 data-i18n="appName">Auto Poster <span class="pro-badge">PRO</span></h1>
       </div>
       <div class="status-indicator" id="statusIndicator">
         <span class="status-dot"></span>
@@ -25,412 +25,453 @@
 
     <!-- Navigation Tabs -->
     <nav class="tabs">
-      <button class="tab active" data-tab="compose" data-i18n="tabCompose">Composer</button>
-      <button class="tab" data-tab="schedule" data-i18n="tabSchedule">Programmer</button>
-      <button class="tab" data-tab="templates" data-i18n="tabTemplates">Modeles</button>
-      <button class="tab" data-tab="bulk" data-i18n="tabBulk">Bulk</button>
-      <button class="tab" data-tab="analytics" data-i18n="tabAnalytics">Stats</button>
-      <button class="tab" data-tab="accounts" data-i18n="tabAccounts">Comptes</button>
-      <button class="tab" data-tab="history" data-i18n="tabHistory">Historique</button>
-      <button class="tab" data-tab="settings" data-i18n="tabSettings">Params</button>
+      <button class="tab active" data-tab="compose">Composer</button>
+      <button class="tab" data-tab="schedule">Programmer</button>
+      <button class="tab" data-tab="autolike">Auto Like</button>
+      <button class="tab" data-tab="autocomment">Commenter</button>
+      <button class="tab" data-tab="groups">Groupes</button>
+      <button class="tab" data-tab="members">Membres</button>
+      <button class="tab" data-tab="autoshare">Partager</button>
+      <button class="tab" data-tab="autofriend">Amis</button>
+      <button class="tab" data-tab="campaigns">Campagnes</button>
+      <button class="tab" data-tab="bulk">Bulk</button>
+      <button class="tab" data-tab="analytics">Stats</button>
+      <button class="tab" data-tab="settings">Params</button>
     </nav>
+
 
     <!-- ============ COMPOSE TAB ============ -->
     <section class="tab-content active" id="compose">
       <div class="form-group">
-        <label for="postContent" data-i18n="postContent">Contenu du post</label>
-        <textarea id="postContent" data-i18n-placeholder="postPlaceholder" placeholder="Ecrivez votre publication ici..." rows="5"></textarea>
-        <div class="char-count"><span id="charCount">0</span> <span data-i18n="characters">caracteres</span></div>
-        <div class="spintax-hint" id="spintaxHint" style="display:none" data-i18n="spintaxHelp">Utilisez {option1|option2|option3} pour varier le contenu</div>
+        <label for="postContent">Contenu du post</label>
+        <textarea id="postContent" placeholder="Ecrivez votre publication ici..." rows="4"></textarea>
+        <div class="char-count"><span id="charCount">0</span> caracteres</div>
       </div>
-
       <div class="form-group">
-        <label for="postTarget" data-i18n="publishOn">Publier sur</label>
+        <label for="postTarget">Publier sur</label>
         <select id="postTarget">
-          <option value="timeline" data-i18n="myProfile">Mon profil</option>
-          <option value="page" data-i18n="myPage">Ma page</option>
-          <option value="group" data-i18n="aGroup">Un groupe</option>
-          <option value="multiple" data-i18n="multipleTargets">Cibles multiples</option>
+          <option value="timeline">Mon profil</option>
+          <option value="page">Ma page</option>
+          <option value="group">Un groupe</option>
+          <option value="multiple">Cibles multiples</option>
         </select>
       </div>
-
       <div class="form-group" id="targetUrlGroup">
-        <label for="targetUrl" data-i18n="targetUrl">URL de destination (optionnel)</label>
-        <input type="url" id="targetUrl" data-i18n-placeholder="targetUrlPlaceholder" placeholder="https://www.facebook.com/groups/...">
+        <label for="targetUrl">URL de destination</label>
+        <input type="url" id="targetUrl" placeholder="https://www.facebook.com/groups/...">
       </div>
-
-      <!-- Multi-target selector -->
       <div class="form-group" id="multiTargetGroup" style="display:none">
-        <label data-i18n="multipleTargets">Cibles multiples</label>
+        <label>Cibles multiples</label>
         <div id="accountCheckboxes" class="checkbox-group"></div>
       </div>
-
       <div class="form-group">
-        <label data-i18n="options">Options</label>
+        <label>Options</label>
         <div class="checkbox-group">
-          <label class="checkbox-label">
-            <input type="checkbox" id="addEmoji"> <span data-i18n="addEmoji">Ajouter des emojis</span>
-          </label>
-          <label class="checkbox-label">
-            <input type="checkbox" id="addHashtags"> <span data-i18n="addHashtags">Ajouter des hashtags</span>
-          </label>
-          <label class="checkbox-label">
-            <input type="checkbox" id="useSpintax"> <span data-i18n="useSpintax">Utiliser Spintax</span>
-          </label>
+          <label class="checkbox-label"><input type="checkbox" id="addEmoji"> Emojis</label>
+          <label class="checkbox-label"><input type="checkbox" id="addHashtags"> Hashtags</label>
+          <label class="checkbox-label"><input type="checkbox" id="useSpintax"> Spintax</label>
         </div>
       </div>
-
+      <div class="spintax-hint" id="spintaxHint" style="display:none">Utilisez {option1|option2} pour varier</div>
       <div class="actions">
-        <button class="btn btn-primary" id="publishNow">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
-          </svg>
-          <span data-i18n="publishNow">Publier maintenant</span>
-        </button>
-        <button class="btn btn-secondary" id="addToSchedule">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
-          </svg>
-          <span data-i18n="schedulePost">Programmer</span>
-        </button>
+        <button class="btn btn-primary" id="publishNow">Publier maintenant</button>
+        <button class="btn btn-secondary" id="addToSchedule">Programmer</button>
       </div>
     </section>
 
     <!-- ============ SCHEDULE TAB ============ -->
     <section class="tab-content" id="schedule">
       <div class="schedule-form">
+        <div class="form-group"><label>Date</label><input type="date" id="scheduleDate"></div>
+        <div class="form-group"><label>Heure</label><input type="time" id="scheduleTime"></div>
         <div class="form-group">
-          <label for="scheduleDate" data-i18n="date">Date</label>
-          <input type="date" id="scheduleDate">
-        </div>
-        <div class="form-group">
-          <label for="scheduleTime" data-i18n="time">Heure</label>
-          <input type="time" id="scheduleTime">
-        </div>
-        <div class="form-group">
-          <label for="repeatOption" data-i18n="repeat">Repetition</label>
+          <label>Repetition</label>
           <select id="repeatOption">
-            <option value="none" data-i18n="repeatNone">Aucune</option>
-            <option value="daily" data-i18n="repeatDaily">Quotidienne</option>
-            <option value="weekly" data-i18n="repeatWeekly">Hebdomadaire</option>
-            <option value="monthly" data-i18n="repeatMonthly">Mensuelle</option>
+            <option value="none">Aucune</option>
+            <option value="daily">Quotidienne</option>
+            <option value="weekly">Hebdomadaire</option>
+            <option value="monthly">Mensuelle</option>
           </select>
         </div>
       </div>
-
-      <div class="scheduled-posts" id="scheduledPosts">
-        <h3 data-i18n="scheduledPosts">Posts programmes</h3>
-        <div class="empty-state" id="emptySchedule">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="1.5">
-            <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
-          </svg>
-          <p data-i18n="noScheduledPosts">Aucun post programme</p>
-        </div>
-        <div class="posts-list" id="scheduleList"></div>
-      </div>
+      <h3>Posts programmes</h3>
+      <div class="empty-state" id="emptySchedule"><p>Aucun post programme</p></div>
+      <div class="posts-list" id="scheduleList"></div>
     </section>
 
-    <!-- ============ TEMPLATES TAB ============ -->
-    <section class="tab-content" id="templates">
+    <!-- ============ AUTO LIKE TAB ============ -->
+    <section class="tab-content" id="autolike">
+      <h3>Auto Like</h3>
       <div class="form-group">
-        <label for="templateName" data-i18n="templateName">Nom du modele</label>
-        <input type="text" id="templateName" placeholder="Mon modele...">
+        <label for="likeTargetUrl">URL cible (vide = fil d'actu)</label>
+        <input type="url" id="likeTargetUrl" placeholder="https://www.facebook.com/groups/...">
       </div>
       <div class="form-group">
-        <label for="templateCategory" data-i18n="templateCategory">Categorie</label>
-        <select id="templateCategory">
-          <option value="marketing" data-i18n="catMarketing">Marketing</option>
-          <option value="engagement" data-i18n="catEngagement">Engagement</option>
-          <option value="promotion" data-i18n="catPromotion">Promotion</option>
-          <option value="education" data-i18n="catEducation">Education</option>
-          <option value="entertainment" data-i18n="catEntertainment">Divertissement</option>
-          <option value="news" data-i18n="catNews">Actualites</option>
-          <option value="personal" data-i18n="catPersonal">Personnel</option>
+        <label for="maxLikes">Nombre max de likes</label>
+        <input type="number" id="maxLikes" value="20" min="1" max="100">
+      </div>
+      <div class="form-group">
+        <label>Delai entre likes (sec)</label>
+        <div class="inline-inputs">
+          <input type="number" id="likeDelayMin" value="5" min="1" max="60" style="width:48%">
+          <input type="number" id="likeDelayMax" value="15" min="1" max="120" style="width:48%">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Type de reaction</label>
+        <select id="likeType">
+          <option value="like">👍 Like</option>
+          <option value="love">❤️ Love</option>
+          <option value="haha">😂 Haha</option>
+          <option value="wow">😮 Wow</option>
         </select>
       </div>
-      <div class="form-group">
-        <label for="templateContent">Contenu</label>
-        <textarea id="templateContent" rows="4" placeholder="Contenu du modele avec {spintax|support}..."></textarea>
+      <div class="actions">
+        <button class="btn btn-primary" id="startAutoLike">Demarrer Auto Like</button>
+        <button class="btn btn-danger" id="stopAutoLike" style="display:none">Arreter</button>
       </div>
-      <button class="btn btn-primary" id="saveTemplate" style="width:100%;margin-bottom:16px">
-        <span data-i18n="saveTemplate">Sauvegarder le modele</span>
-      </button>
-      
-      <h3 style="margin-bottom:10px">Quick Templates</h3>
-      <div class="quick-templates" id="quickTemplates">
-        <button class="btn btn-secondary btn-sm" data-category="marketing">Marketing</button>
-        <button class="btn btn-secondary btn-sm" data-category="engagement">Engagement</button>
-        <button class="btn btn-secondary btn-sm" data-category="promotion">Promotion</button>
-      </div>
-
-      <h3 style="margin:16px 0 10px" data-i18n="savedTemplates">Modeles sauvegardes</h3>
-      <div class="posts-list" id="templateList">
-        <div class="empty-state">
-          <p data-i18n="noTemplates">Aucun modele sauvegarde</p>
-        </div>
+      <div class="progress-section" id="likeProgress" style="display:none">
+        <div class="progress-bar"><div class="progress-fill" id="likeProgressFill"></div></div>
+        <div class="progress-text" id="likeProgressText">0/0</div>
       </div>
     </section>
+
+    <!-- ============ AUTO COMMENT TAB ============ -->
+    <section class="tab-content" id="autocomment">
+      <h3>Auto Comment</h3>
+      <div class="form-group">
+        <label for="commentTargetUrl">URL cible (groupe/page)</label>
+        <input type="url" id="commentTargetUrl" placeholder="https://www.facebook.com/groups/...">
+      </div>
+      <div class="form-group">
+        <label for="maxComments">Nombre de commentaires</label>
+        <input type="number" id="maxComments" value="10" min="1" max="50">
+      </div>
+      <div class="form-group">
+        <label for="commentTemplates">Templates (un par ligne)</label>
+        <textarea id="commentTemplates" rows="4" placeholder="Super post! 🔥&#10;Tres interessant! 👍&#10;Merci pour le partage! 🙏"></textarea>
+      </div>
+      <div class="form-group">
+        <div class="checkbox-group">
+          <label class="checkbox-label"><input type="checkbox" id="commentPromoMode"> Mode promo</label>
+          <label class="checkbox-label"><input type="checkbox" id="commentSpintax"> Spintax</label>
+        </div>
+      </div>
+      <div class="form-group" id="promoLinkGroup" style="display:none">
+        <label for="commentPromoLink">Lien promo</label>
+        <input type="url" id="commentPromoLink" placeholder="https://...">
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" id="startAutoComment">Demarrer</button>
+        <button class="btn btn-danger" id="stopAutoComment" style="display:none">Arreter</button>
+      </div>
+    </section>
+
+    <!-- ============ GROUPS TAB ============ -->
+    <section class="tab-content" id="groups">
+      <h3>Auto Join Groupes</h3>
+      <div class="form-group">
+        <label for="groupUrls">URLs des groupes (un par ligne)</label>
+        <textarea id="groupUrls" rows="4" placeholder="https://www.facebook.com/groups/groupe1&#10;https://www.facebook.com/groups/groupe2"></textarea>
+      </div>
+      <div class="form-group">
+        <label for="groupKeywords">Ou rechercher par mots-cles</label>
+        <input type="text" id="groupKeywords" placeholder="marketing, business, vente...">
+      </div>
+      <div class="form-group">
+        <label>Max groupes par session</label>
+        <input type="number" id="maxGroupJoin" value="10" min="1" max="30">
+      </div>
+      <div class="form-group">
+        <div class="checkbox-group">
+          <label class="checkbox-label"><input type="checkbox" id="answerGroupQuestions" checked> Repondre aux questions</label>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" id="startGroupJoin">Rejoindre les groupes</button>
+        <button class="btn btn-danger" id="stopGroupJoin" style="display:none">Arreter</button>
+      </div>
+      <div class="progress-section" id="groupProgress" style="display:none">
+        <div class="progress-bar"><div class="progress-fill" id="groupProgressFill"></div></div>
+        <div class="progress-text" id="groupProgressText">0/0</div>
+      </div>
+      <h4 style="margin-top:12px">Groupes rejoints</h4>
+      <div class="posts-list" id="joinedGroupsList"></div>
+    </section>
+
+
+    <!-- ============ MEMBERS TAB ============ -->
+    <section class="tab-content" id="members">
+      <h3>Extraction de Membres</h3>
+      <div class="form-group">
+        <label for="extractGroupUrl">URL du groupe</label>
+        <input type="url" id="extractGroupUrl" placeholder="https://www.facebook.com/groups/...">
+      </div>
+      <div class="form-group">
+        <label for="maxMembers">Max membres a extraire</label>
+        <input type="number" id="maxMembers" value="100" min="10" max="500">
+      </div>
+      <div class="form-group">
+        <label>Type d'extraction</label>
+        <select id="extractType">
+          <option value="all">Tous les membres</option>
+          <option value="active">Membres actifs seulement</option>
+          <option value="admins">Admins/Moderateurs</option>
+        </select>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" id="startExtraction">Extraire</button>
+        <button class="btn btn-danger" id="stopExtraction" style="display:none">Arreter</button>
+      </div>
+      <div class="progress-section" id="extractProgress" style="display:none">
+        <div class="progress-bar"><div class="progress-fill" id="extractProgressFill"></div></div>
+        <div class="progress-text" id="extractProgressText">0/0 membres</div>
+      </div>
+      <h4 style="margin-top:12px">Extractions sauvegardees</h4>
+      <div class="posts-list" id="extractionsList"></div>
+      <div class="actions" style="margin-top:8px">
+        <button class="btn btn-secondary btn-sm" id="exportMembersCSV">Export CSV</button>
+        <button class="btn btn-secondary btn-sm" id="exportMembersJSON">Export JSON</button>
+        <button class="btn btn-secondary btn-sm" id="sendFriendToExtracted">Ajouter en amis</button>
+      </div>
+    </section>
+
+    <!-- ============ AUTO SHARE TAB ============ -->
+    <section class="tab-content" id="autoshare">
+      <h3>Auto Partage</h3>
+      <div class="form-group">
+        <label for="sharePostUrl">URL du post a partager</label>
+        <input type="url" id="sharePostUrl" placeholder="https://www.facebook.com/.../posts/...">
+      </div>
+      <div class="form-group">
+        <label for="shareGroupUrls">Groupes cibles (un par ligne)</label>
+        <textarea id="shareGroupUrls" rows="3" placeholder="https://www.facebook.com/groups/groupe1&#10;https://www.facebook.com/groups/groupe2"></textarea>
+      </div>
+      <div class="form-group">
+        <label for="shareCaption">Texte d'accompagnement</label>
+        <textarea id="shareCaption" rows="2" placeholder="Regardez ca! {Super|Genial|Incroyable}..."></textarea>
+      </div>
+      <div class="form-group">
+        <div class="checkbox-group">
+          <label class="checkbox-label"><input type="checkbox" id="shareSpintax"> Spintax</label>
+          <label class="checkbox-label"><input type="checkbox" id="shareEmoji"> Ajouter emojis</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Delai entre partages (sec)</label>
+        <input type="number" id="shareDelay" value="60" min="10" max="300">
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" id="startAutoShare">Partager</button>
+        <button class="btn btn-danger" id="stopAutoShare" style="display:none">Arreter</button>
+      </div>
+      <div class="progress-section" id="shareProgress" style="display:none">
+        <div class="progress-bar"><div class="progress-fill" id="shareProgressFill"></div></div>
+        <div class="progress-text" id="shareProgressText">0/0</div>
+      </div>
+    </section>
+
+    <!-- ============ AUTO FRIEND TAB ============ -->
+    <section class="tab-content" id="autofriend">
+      <h3>Auto Ajout d'Amis</h3>
+      <div class="form-group">
+        <label>Source des profils</label>
+        <select id="friendSource">
+          <option value="urls">Liste d'URLs</option>
+          <option value="group">Membres d'un groupe</option>
+          <option value="suggested">Amis suggeres</option>
+          <option value="extraction">Extraction sauvegardee</option>
+        </select>
+      </div>
+      <div class="form-group" id="friendUrlsGroup">
+        <label for="friendProfileUrls">URLs des profils (un par ligne)</label>
+        <textarea id="friendProfileUrls" rows="3" placeholder="https://www.facebook.com/profile1&#10;https://www.facebook.com/profile2"></textarea>
+      </div>
+      <div class="form-group" id="friendGroupUrlGroup" style="display:none">
+        <label for="friendGroupUrl">URL du groupe</label>
+        <input type="url" id="friendGroupUrl" placeholder="https://www.facebook.com/groups/...">
+      </div>
+      <div class="form-group">
+        <label for="maxFriendRequests">Max demandes</label>
+        <input type="number" id="maxFriendRequests" value="15" min="1" max="50">
+      </div>
+      <div class="form-group">
+        <div class="checkbox-group">
+          <label class="checkbox-label"><input type="checkbox" id="sendIntroMessage"> Envoyer un message intro</label>
+        </div>
+      </div>
+      <div class="form-group" id="introMessageGroup" style="display:none">
+        <label for="introMessage">Message d'introduction</label>
+        <textarea id="introMessage" rows="2" placeholder="{Salut|Bonjour}! Je cherche a elargir mon reseau..."></textarea>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" id="startAutoFriend">Envoyer les demandes</button>
+        <button class="btn btn-danger" id="stopAutoFriend" style="display:none">Arreter</button>
+      </div>
+      <div class="progress-section" id="friendProgress" style="display:none">
+        <div class="progress-bar"><div class="progress-fill" id="friendProgressFill"></div></div>
+        <div class="progress-text" id="friendProgressText">0/0</div>
+      </div>
+    </section>
+
+    <!-- ============ CAMPAIGNS TAB ============ -->
+    <section class="tab-content" id="campaigns">
+      <h3>Campagnes de Promotion</h3>
+      <div class="form-group">
+        <label for="campaignName">Nom de la campagne</label>
+        <input type="text" id="campaignName" placeholder="Ma campagne produit...">
+      </div>
+      <div class="form-group">
+        <label for="productName">Nom du produit</label>
+        <input type="text" id="productName" placeholder="Mon Super Produit">
+      </div>
+      <div class="form-group">
+        <label for="productUrl">Lien du produit</label>
+        <input type="url" id="productUrl" placeholder="https://...">
+      </div>
+      <div class="form-group">
+        <label for="productDescription">Description courte</label>
+        <textarea id="productDescription" rows="2" placeholder="Description de votre produit..."></textarea>
+      </div>
+      <div class="form-group">
+        <label for="campaignGroups">Groupes cibles (un par ligne)</label>
+        <textarea id="campaignGroups" rows="3" placeholder="https://www.facebook.com/groups/..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Actions automatiques</label>
+        <div class="checkbox-group">
+          <label class="checkbox-label"><input type="checkbox" id="campAutoPost" checked> Auto Post</label>
+          <label class="checkbox-label"><input type="checkbox" id="campAutoComment" checked> Auto Comment</label>
+          <label class="checkbox-label"><input type="checkbox" id="campAutoLike" checked> Auto Like</label>
+          <label class="checkbox-label"><input type="checkbox" id="campAutoShare"> Auto Share</label>
+          <label class="checkbox-label"><input type="checkbox" id="campAutoFriend"> Auto Friend</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="campaignLang">Langue</label>
+        <select id="campaignLang">
+          <option value="fr">Francais</option>
+          <option value="ar">العربية</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" id="createCampaign">Creer la campagne</button>
+      </div>
+      <h4 style="margin-top:14px">Mes Campagnes</h4>
+      <div class="posts-list" id="campaignsList"></div>
+    </section>
+
 
     <!-- ============ BULK TAB ============ -->
     <section class="tab-content" id="bulk">
-      <h3 data-i18n="bulkTitle">Publication en masse</h3>
-      
-      <div class="form-group" style="margin-top:12px">
-        <div class="file-import-row">
-          <button class="btn btn-secondary btn-sm" id="importCSVBtn">
-            <span data-i18n="importCSV">Importer CSV</span>
-          </button>
-          <button class="btn btn-secondary btn-sm" id="importTXTBtn">
-            <span data-i18n="importTXT">Importer TXT</span>
-          </button>
-          <input type="file" id="fileImport" accept=".csv,.txt" style="display:none">
-        </div>
+      <h3>Publication en masse</h3>
+      <div class="form-group file-import-row">
+        <button class="btn btn-secondary btn-sm" id="importCSVBtn">Import CSV</button>
+        <button class="btn btn-secondary btn-sm" id="importTXTBtn">Import TXT</button>
+        <input type="file" id="fileImport" accept=".csv,.txt" style="display:none">
       </div>
-
       <div class="form-group">
-        <label for="bulkContent" data-i18n="bulkContent">Entrez les posts (un par ligne)</label>
-        <textarea id="bulkContent" rows="6" data-i18n-placeholder="bulkPlaceholder" placeholder="Premier post&#10;Deuxieme post&#10;Troisieme post"></textarea>
+        <label for="bulkContent">Posts (un par ligne)</label>
+        <textarea id="bulkContent" rows="5" placeholder="Premier post&#10;Deuxieme post&#10;Troisieme post"></textarea>
         <div class="char-count"><span id="bulkCount">0</span> posts</div>
       </div>
-
       <div class="form-group">
-        <label for="bulkInterval" data-i18n="intervalMinutes">Intervalle (minutes)</label>
+        <label>Intervalle (minutes)</label>
         <input type="number" id="bulkInterval" value="10" min="1" max="120">
       </div>
-
       <div class="form-group">
         <div class="checkbox-group">
-          <label class="checkbox-label">
-            <input type="checkbox" id="bulkSpintax"> <span data-i18n="useSpintax">Utiliser Spintax</span>
-          </label>
-          <label class="checkbox-label">
-            <input type="checkbox" id="bulkEmoji"> <span data-i18n="addEmoji">Ajouter emojis</span>
-          </label>
-          <label class="checkbox-label">
-            <input type="checkbox" id="bulkHashtags"> <span data-i18n="addHashtags">Ajouter hashtags</span>
-          </label>
+          <label class="checkbox-label"><input type="checkbox" id="bulkSpintax"> Spintax</label>
+          <label class="checkbox-label"><input type="checkbox" id="bulkEmoji"> Emojis</label>
+          <label class="checkbox-label"><input type="checkbox" id="bulkHashtags"> Hashtags</label>
         </div>
       </div>
-
       <div class="actions">
-        <button class="btn btn-primary" id="startBulk">
-          <span data-i18n="startBulk">Demarrer le bulk</span>
-        </button>
-        <button class="btn btn-danger" id="stopBulk" style="display:none">
-          <span data-i18n="stopBulk">Arreter</span>
-        </button>
+        <button class="btn btn-primary" id="startBulk">Demarrer</button>
+        <button class="btn btn-danger" id="stopBulk" style="display:none">Arreter</button>
       </div>
-
-      <div class="bulk-progress" id="bulkProgress" style="display:none">
-        <div class="progress-bar">
-          <div class="progress-fill" id="progressFill"></div>
-        </div>
+      <div class="progress-section" id="bulkProgress" style="display:none">
+        <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
         <div class="progress-text" id="progressText">0/0</div>
       </div>
     </section>
 
     <!-- ============ ANALYTICS TAB ============ -->
     <section class="tab-content" id="analytics">
-      <h3 data-i18n="analyticsTitle">Tableau de bord</h3>
-      
-      <div class="history-stats" style="margin-top:12px">
-        <div class="stat-card">
-          <span class="stat-number" id="statToday">0</span>
-          <span class="stat-label" data-i18n="postsToday">Aujourd'hui</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-number" id="statWeek">0</span>
-          <span class="stat-label" data-i18n="postsThisWeek">Cette semaine</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-number" id="statMonth">0</span>
-          <span class="stat-label" data-i18n="postsThisMonth">Ce mois</span>
-        </div>
+      <h3>Tableau de bord</h3>
+      <div class="history-stats">
+        <div class="stat-card"><span class="stat-number" id="statToday">0</span><span class="stat-label">Aujourd'hui</span></div>
+        <div class="stat-card"><span class="stat-number" id="statWeek">0</span><span class="stat-label">Semaine</span></div>
+        <div class="stat-card"><span class="stat-number" id="statMonth">0</span><span class="stat-label">Mois</span></div>
       </div>
-
+      <div class="history-stats">
+        <div class="stat-card"><span class="stat-number" id="statLikes">0</span><span class="stat-label">Likes</span></div>
+        <div class="stat-card"><span class="stat-number" id="statComments">0</span><span class="stat-label">Comments</span></div>
+        <div class="stat-card"><span class="stat-number" id="statShares">0</span><span class="stat-label">Shares</span></div>
+      </div>
       <div class="stat-card" style="margin-bottom:12px">
         <span class="stat-number" id="statRate">0%</span>
-        <span class="stat-label" data-i18n="successRate">Taux de reussite</span>
+        <span class="stat-label">Taux de reussite</span>
       </div>
-
       <div class="analytics-section">
-        <h4 data-i18n="bestTime">Meilleur moment pour poster</h4>
-        <div id="bestTimesDisplay" class="best-times"></div>
+        <h4>Activite (14 jours)</h4>
+        <canvas id="activityChart" width="360" height="100"></canvas>
       </div>
-
-      <div class="analytics-section">
-        <h4 data-i18n="activityChart">Activite (30 jours)</h4>
-        <canvas id="activityChart" width="360" height="120"></canvas>
-      </div>
-
       <div class="analytics-section">
         <h4>Insights</h4>
         <div id="insightsList" class="insights-list"></div>
       </div>
-
-      <div class="actions" style="margin-top:12px">
-        <button class="btn btn-secondary" id="exportAnalytics">Exporter CSV</button>
-        <button class="btn btn-danger" id="resetAnalytics">Reset</button>
-      </div>
-    </section>
-
-    <!-- ============ ACCOUNTS TAB ============ -->
-    <section class="tab-content" id="accounts">
-      <h3 data-i18n="accountsTitle">Gestion des comptes</h3>
-      
-      <div class="form-group" style="margin-top:12px">
-        <label for="accountName" data-i18n="accountName">Nom du compte</label>
-        <input type="text" id="accountName" placeholder="Ma page business...">
-      </div>
-      <div class="form-group">
-        <label for="accountType" data-i18n="accountType">Type</label>
-        <select id="accountType">
-          <option value="profile" data-i18n="typeProfile">Profil</option>
-          <option value="page" data-i18n="typePage">Page</option>
-          <option value="group" data-i18n="typeGroup">Groupe</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label for="accountUrl" data-i18n="accountUrl">URL</label>
-        <input type="url" id="accountUrl" placeholder="https://www.facebook.com/...">
-      </div>
-      <button class="btn btn-primary" id="addAccountBtn" style="width:100%;margin-bottom:16px">
-        <span data-i18n="addAccount">Ajouter</span>
-      </button>
-
-      <div class="posts-list" id="accountsList">
-        <div class="empty-state">
-          <p data-i18n="noAccounts">Aucun compte ajoute</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============ HISTORY TAB ============ -->
-    <section class="tab-content" id="history">
-      <div class="history-stats">
-        <div class="stat-card">
-          <span class="stat-number" id="totalPosts">0</span>
-          <span class="stat-label" data-i18n="totalPosts">Total posts</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-number" id="successPosts">0</span>
-          <span class="stat-label" data-i18n="successful">Reussis</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-number" id="failedPosts">0</span>
-          <span class="stat-label" data-i18n="failed">Echoues</span>
-        </div>
-      </div>
-      <div class="posts-list" id="historyList">
-        <div class="empty-state">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="1.5">
-            <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-          <p data-i18n="noHistory">Aucun historique</p>
-        </div>
+      <div class="actions">
+        <button class="btn btn-secondary btn-sm" id="exportAnalytics">Export CSV</button>
+        <button class="btn btn-danger btn-sm" id="resetAnalytics">Reset</button>
       </div>
     </section>
 
     <!-- ============ SETTINGS TAB ============ -->
     <section class="tab-content" id="settings">
-      <!-- Language -->
       <div class="form-group">
-        <label for="languageSelect" data-i18n="language">Langue</label>
+        <label for="languageSelect">Langue</label>
         <select id="languageSelect">
           <option value="fr">Francais</option>
           <option value="ar">العربية</option>
           <option value="en">English</option>
         </select>
       </div>
-
-      <!-- Delays -->
       <div class="form-group">
-        <label for="delayMin" data-i18n="delayMin">Delai minimum (minutes)</label>
-        <input type="number" id="delayMin" value="5" min="1" max="60">
-      </div>
-      <div class="form-group">
-        <label for="delayMax" data-i18n="delayMax">Delai maximum (minutes)</label>
-        <input type="number" id="delayMax" value="15" min="1" max="120">
-      </div>
-
-      <!-- Behavior -->
-      <div class="form-group">
-        <label data-i18n="behavior">Comportement</label>
-        <div class="checkbox-group">
-          <label class="checkbox-label">
-            <input type="checkbox" id="randomDelay" checked> <span data-i18n="randomDelay">Delai aleatoire</span>
-          </label>
-          <label class="checkbox-label">
-            <input type="checkbox" id="notifySuccess" checked> <span data-i18n="notifySuccess">Notification succes</span>
-          </label>
-          <label class="checkbox-label">
-            <input type="checkbox" id="notifyError" checked> <span data-i18n="notifyError">Notification erreur</span>
-          </label>
-          <label class="checkbox-label">
-            <input type="checkbox" id="autoRetry"> <span data-i18n="autoRetry">Auto-retry</span>
-          </label>
+        <label>Delai min/max entre actions (min)</label>
+        <div class="inline-inputs">
+          <input type="number" id="delayMin" value="5" min="1" max="60" style="width:48%">
+          <input type="number" id="delayMax" value="15" min="1" max="120" style="width:48%">
         </div>
       </div>
       <div class="form-group">
-        <label for="maxRetries" data-i18n="maxRetries">Max tentatives</label>
+        <label>Comportement</label>
+        <div class="checkbox-group">
+          <label class="checkbox-label"><input type="checkbox" id="randomDelay" checked> Delai aleatoire</label>
+          <label class="checkbox-label"><input type="checkbox" id="notifySuccess" checked> Notification succes</label>
+          <label class="checkbox-label"><input type="checkbox" id="notifyError" checked> Notification erreur</label>
+          <label class="checkbox-label"><input type="checkbox" id="autoRetry"> Auto-retry</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Anti-detection</label>
+        <div class="checkbox-group">
+          <label class="checkbox-label"><input type="checkbox" id="humanMode" checked> Mode humain</label>
+          <label class="checkbox-label"><input type="checkbox" id="randomScrolling"> Scroll aleatoire</label>
+          <label class="checkbox-label"><input type="checkbox" id="randomPause" checked> Pauses aleatoires</label>
+          <label class="checkbox-label"><input type="checkbox" id="fingerprint"> Protection empreinte</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Max tentatives</label>
         <input type="number" id="maxRetries" value="3" min="1" max="10">
       </div>
-
-      <!-- Anti-Detection -->
-      <div class="form-group">
-        <label data-i18n="antiDetection">Anti-detection</label>
-        <div class="checkbox-group">
-          <label class="checkbox-label">
-            <input type="checkbox" id="humanMode" checked> <span data-i18n="humanMode">Mode humain</span>
-          </label>
-          <label class="checkbox-label">
-            <input type="checkbox" id="randomScrolling"> <span data-i18n="randomScrolling">Scroll aleatoire</span>
-          </label>
-          <label class="checkbox-label">
-            <input type="checkbox" id="randomPause" checked> <span data-i18n="randomPause">Pauses aleatoires</span>
-          </label>
-          <label class="checkbox-label">
-            <input type="checkbox" id="fingerprint"> <span data-i18n="fingerprint">Protection empreinte</span>
-          </label>
-        </div>
-      </div>
-
-      <!-- Auto Reply -->
-      <div class="form-group">
-        <label data-i18n="autoReply">Reponse automatique</label>
-        <div class="checkbox-group">
-          <label class="checkbox-label">
-            <input type="checkbox" id="autoReplyEnabled"> <span data-i18n="autoReplyEnabled">Activer reponse auto</span>
-          </label>
-        </div>
-      </div>
-      <div class="form-group">
-        <label for="replyDelay" data-i18n="replyDelay">Delai reponse (sec)</label>
-        <input type="number" id="replyDelay" value="30" min="5" max="300">
-      </div>
-
-      <!-- Watermark -->
-      <div class="form-group">
-        <label data-i18n="watermark">Filigrane</label>
-        <input type="text" id="watermarkText" placeholder="Auto Poster Pro">
-        <select id="watermarkPosition" style="margin-top:8px">
-          <option value="bottomRight" data-i18n="posBottomRight">Bas droite</option>
-          <option value="bottomLeft" data-i18n="posBottomLeft">Bas gauche</option>
-          <option value="topRight" data-i18n="posTopRight">Haut droite</option>
-          <option value="topLeft" data-i18n="posTopLeft">Haut gauche</option>
-          <option value="center" data-i18n="posCenter">Centre</option>
-        </select>
-      </div>
-
-      <button class="btn btn-primary" id="saveSettings" style="width:100%">
-        <span data-i18n="saveSettings">Sauvegarder les parametres</span>
-      </button>
+      <button class="btn btn-primary" id="saveSettings" style="width:100%">Sauvegarder</button>
     </section>
 
     <!-- Footer -->
-    <footer class="footer">
-      <span>Facebook Auto Poster Pro v2.0.0 - Ultimate Edition</span>
-    </footer>
+    <footer class="footer">Facebook Auto Poster Pro v3.0.0 - Ultimate Marketing Edition</footer>
   </div>
 
   <!-- Scripts -->
@@ -442,6 +483,13 @@
   <script src="../lib/accounts.js"></script>
   <script src="../lib/auto-reply.js"></script>
   <script src="../lib/watermark.js"></script>
+  <script src="../lib/auto-like.js"></script>
+  <script src="../lib/auto-comment.js"></script>
+  <script src="../lib/auto-group-join.js"></script>
+  <script src="../lib/member-extractor.js"></script>
+  <script src="../lib/auto-share.js"></script>
+  <script src="../lib/auto-friend.js"></script>
+  <script src="../lib/promotion-engine.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

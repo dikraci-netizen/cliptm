@@ -15,7 +15,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'publishPost') {
     publishPost(message.data).then(sendResponse);
-    return true; // Keep channel open for async response
+    return true;
   }
   
   if (message.action === 'getStatus') {
@@ -27,7 +27,37 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     handlePostResult(message.data).then(sendResponse);
     return true;
   }
+
+  if (message.action === 'contentAction') {
+    executeContentAction(message.data).then(sendResponse);
+    return true;
+  }
+
+  if (message.action === 'executeInTab') {
+    executeContentAction(message.data).then(sendResponse);
+    return true;
+  }
 });
+
+// === EXECUTE CONTENT ACTION IN TAB ===
+async function executeContentAction(data) {
+  try {
+    const url = data.url || 'https://www.facebook.com/';
+    const tab = await getFacebookTab(url);
+    if (!tab) return { success: false, error: 'Cannot open Facebook tab' };
+    
+    await wait(2000);
+    
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      action: 'contentAction',
+      data
+    });
+    
+    return response || { success: false, error: 'No response from content script' };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
 
 // === PUBLISH POST ===
 async function publishPost(data) {

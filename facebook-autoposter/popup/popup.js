@@ -1,42 +1,27 @@
-// Facebook Auto Poster Pro - Ultimate Edition - Popup Script
+// Facebook Auto Poster Pro v3.0 - Ultimate Marketing Edition - Popup Script
 class FacebookAutoPoster {
-  constructor() {
-    this.init();
-  }
+  constructor() { this.init(); }
 
   async init() {
     await I18N.loadLang();
-    this.applyTranslations();
     this.bindTabs();
     this.bindCompose();
     this.bindSchedule();
-    this.bindTemplates();
+    this.bindAutoLike();
+    this.bindAutoComment();
+    this.bindGroups();
+    this.bindMembers();
+    this.bindAutoShare();
+    this.bindAutoFriend();
+    this.bindCampaigns();
     this.bindBulk();
     this.bindAnalytics();
-    this.bindAccounts();
     this.bindSettings();
     this.loadData();
     this.updateStatus();
   }
 
-  // === INTERNATIONALIZATION ===
-  applyTranslations() {
-    document.querySelectorAll('[data-i18n]').forEach(el => {
-      const key = el.getAttribute('data-i18n');
-      const text = I18N.t(key);
-      if (text !== key) el.textContent = text;
-    });
-    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-      const key = el.getAttribute('data-i18n-placeholder');
-      const text = I18N.t(key);
-      if (text !== key) el.placeholder = text;
-    });
-    // Set language selector
-    const langSelect = document.getElementById('languageSelect');
-    if (langSelect) langSelect.value = I18N.currentLang;
-  }
-
-  // === TAB NAVIGATION ===
+  // === TABS ===
   bindTabs() {
     document.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
@@ -48,377 +33,394 @@ class FacebookAutoPoster {
     });
   }
 
-  // === COMPOSE TAB ===
+  // === COMPOSE ===
   bindCompose() {
     const textarea = document.getElementById('postContent');
-    const charCount = document.getElementById('charCount');
-    
     textarea.addEventListener('input', () => {
-      charCount.textContent = textarea.value.length;
+      document.getElementById('charCount').textContent = textarea.value.length;
     });
-
-    // Spintax toggle
-    document.getElementById('useSpintax').addEventListener('change', (e) => {
+    document.getElementById('useSpintax').addEventListener('change', e => {
       document.getElementById('spintaxHint').style.display = e.target.checked ? 'block' : 'none';
     });
-
-    // Multi-target toggle
-    document.getElementById('postTarget').addEventListener('change', (e) => {
-      const multiGroup = document.getElementById('multiTargetGroup');
-      const urlGroup = document.getElementById('targetUrlGroup');
-      if (e.target.value === 'multiple') {
-        multiGroup.style.display = 'block';
-        urlGroup.style.display = 'none';
-        this.loadAccountCheckboxes();
-      } else {
-        multiGroup.style.display = 'none';
-        urlGroup.style.display = 'block';
-      }
+    document.getElementById('postTarget').addEventListener('change', e => {
+      document.getElementById('multiTargetGroup').style.display = e.target.value === 'multiple' ? 'block' : 'none';
+      document.getElementById('targetUrlGroup').style.display = e.target.value === 'multiple' ? 'none' : 'block';
     });
-
     document.getElementById('publishNow').addEventListener('click', () => this.publishNow());
     document.getElementById('addToSchedule').addEventListener('click', () => this.addToSchedule());
   }
 
   async publishNow() {
     const content = document.getElementById('postContent').value.trim();
-    if (!content) {
-      this.showToast(I18N.t('writeContent'), 'error');
-      return;
-    }
-
+    if (!content) return this.toast('Ecrivez un contenu', 'error');
     const processed = this.processContent(content);
-    const target = document.getElementById('postTarget').value;
-    
     try {
-      if (target === 'multiple') {
-        // Publish to multiple accounts
-        const checked = document.querySelectorAll('#accountCheckboxes input:checked');
-        const accountIds = [...checked].map(cb => cb.value);
-        const results = await AccountManager.publishToMultiple(processed, accountIds);
-        const successCount = results.filter(r => r.success).length;
-        this.showToast(`${successCount}/${results.length} ${I18N.t('postPublished')}`, successCount > 0 ? 'success' : 'error');
-      } else {
-        const response = await chrome.runtime.sendMessage({
-          action: 'publishPost',
-          data: {
-            content: processed,
-            target,
-            targetUrl: document.getElementById('targetUrl').value
-          }
-        });
-
-        if (response && response.success) {
-          this.showToast(I18N.t('postPublished'), 'success');
-          await Analytics.recordPost({ content: processed, status: 'success', target });
-        } else {
-          this.showToast(I18N.t('postFailed') + ': ' + (response?.error || ''), 'error');
-          await Analytics.recordPost({ content: processed, status: 'failed', target });
-        }
-      }
-      
+      const res = await chrome.runtime.sendMessage({
+        action: 'publishPost',
+        data: { content: processed, target: document.getElementById('postTarget').value, targetUrl: document.getElementById('targetUrl').value }
+      });
+      if (res?.success) { this.toast('Post publie!', 'success'); await Analytics.recordPost({ content: processed, status: 'success', target: 'post' }); }
+      else { this.toast('Erreur: ' + (res?.error || ''), 'error'); await Analytics.recordPost({ content: processed, status: 'failed', target: 'post' }); }
       document.getElementById('postContent').value = '';
       document.getElementById('charCount').textContent = '0';
-      this.loadHistory();
-    } catch (error) {
-      this.showToast(I18N.t('connectionError'), 'error');
-      await Analytics.recordPost({ content: processed, status: 'failed', target });
-    }
+    } catch (e) { this.toast('Erreur de connexion', 'error'); }
   }
 
   processContent(content) {
-    let processed = content;
-    
-    // Spintax processing
-    if (document.getElementById('useSpintax').checked) {
-      processed = Spintax.process(processed);
-    }
-    
-    // Emoji enhancement
-    if (document.getElementById('addEmoji').checked) {
-      const category = this.detectCategory(processed);
-      processed = ContentEnhancer.addEmojisToText(processed, category);
-    }
-
-    // Hashtag generation
+    let p = content;
+    if (document.getElementById('useSpintax').checked) p = Spintax.process(p);
+    if (document.getElementById('addEmoji').checked) p = ContentEnhancer.addEmojisToText(p, 'marketing');
     if (document.getElementById('addHashtags').checked) {
-      const category = this.detectCategory(processed);
-      const hashtags = ContentEnhancer.generateHashtags(processed, category, 5);
-      processed += '\n\n' + hashtags.join(' ');
+      const tags = ContentEnhancer.generateHashtags(p, 'marketing', 5);
+      p += '\n\n' + tags.join(' ');
     }
-
-    return processed;
+    return p;
   }
 
-  detectCategory(text) {
-    const lang = ContentEnhancer.detectLanguage(text);
-    if (lang === 'ar') return 'arabic';
-    return 'marketing';
-  }
-
-  async loadAccountCheckboxes() {
-    const accounts = await AccountManager.getActiveAccounts();
-    const container = document.getElementById('accountCheckboxes');
-    if (accounts.length === 0) {
-      container.innerHTML = `<p style="font-size:11px;color:#65676b">${I18N.t('noAccounts')}</p>`;
-      return;
-    }
-    container.innerHTML = accounts.map(a => `
-      <label class="checkbox-label">
-        <input type="checkbox" value="${a.id}" checked> ${this.escapeHtml(a.name)} (${a.type})
-      </label>
-    `).join('');
-  }
-
-  // === SCHEDULE TAB ===
+  // === SCHEDULE ===
   bindSchedule() {
-    const now = new Date();
-    now.setHours(now.getHours() + 1);
+    const now = new Date(); now.setHours(now.getHours() + 1);
     document.getElementById('scheduleDate').valueAsDate = now;
-    document.getElementById('scheduleTime').value = 
-      `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    document.getElementById('scheduleTime').value = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
   }
 
   async addToSchedule() {
     const content = document.getElementById('postContent').value.trim();
-    if (!content) { this.showToast(I18N.t('writeContent'), 'error'); return; }
-
+    if (!content) return this.toast('Ecrivez un contenu', 'error');
     const date = document.getElementById('scheduleDate').value;
     const time = document.getElementById('scheduleTime').value;
-    const repeat = document.getElementById('repeatOption').value;
-
-    if (!date || !time) {
-      document.querySelectorAll('.tab')[1].click();
-      this.showToast(I18N.t('setDateTime'), 'error');
-      return;
-    }
-
-    const scheduledPost = {
-      id: Date.now().toString(),
-      content: this.processContent(content),
-      rawContent: content,
-      date, time, repeat,
-      target: document.getElementById('postTarget').value,
-      targetUrl: document.getElementById('targetUrl').value,
-      status: 'pending',
-      createdAt: new Date().toISOString()
-    };
-
+    if (!date || !time) { document.querySelectorAll('.tab')[1].click(); return this.toast('Choisissez date/heure', 'error'); }
+    const post = { id: Date.now().toString(), content: this.processContent(content), rawContent: content, date, time, repeat: document.getElementById('repeatOption').value, target: document.getElementById('postTarget').value, targetUrl: document.getElementById('targetUrl').value, status: 'pending', createdAt: new Date().toISOString() };
     const { scheduledPosts = [] } = await chrome.storage.local.get('scheduledPosts');
-    scheduledPosts.push(scheduledPost);
+    scheduledPosts.push(post);
     await chrome.storage.local.set({ scheduledPosts });
-    chrome.alarms.create(`post_${scheduledPost.id}`, { when: new Date(`${date}T${time}`).getTime() });
-
-    this.showToast(I18N.t('postScheduled'), 'success');
-    document.getElementById('postContent').value = '';
-    document.getElementById('charCount').textContent = '0';
-    this.loadScheduledPosts();
+    chrome.alarms.create(`post_${post.id}`, { when: new Date(`${date}T${time}`).getTime() });
+    this.toast('Post programme!', 'success');
+    document.getElementById('postContent').value = ''; document.getElementById('charCount').textContent = '0';
+    this.loadSchedule();
   }
 
-  async loadScheduledPosts() {
+  async loadSchedule() {
     const { scheduledPosts = [] } = await chrome.storage.local.get('scheduledPosts');
-    const list = document.getElementById('scheduleList');
-    const emptyState = document.getElementById('emptySchedule');
     const pending = scheduledPosts.filter(p => p.status === 'pending');
-
-    if (pending.length === 0) {
-      list.innerHTML = '';
-      emptyState.style.display = 'flex';
-      return;
-    }
-
-    emptyState.style.display = 'none';
-    list.innerHTML = pending.map(post => `
-      <div class="post-item">
-        <div class="post-item-content">
-          <div class="post-item-text">${this.escapeHtml(post.rawContent)}</div>
-          <div class="post-item-meta">${post.date} - ${post.time} | ${this.getRepeatLabel(post.repeat)}</div>
-        </div>
-        <div class="post-item-actions">
-          <button onclick="app.removeScheduled('${post.id}')" title="${I18N.t('delete')}">✕</button>
-        </div>
-      </div>
-    `).join('');
+    const list = document.getElementById('scheduleList');
+    document.getElementById('emptySchedule').style.display = pending.length ? 'none' : 'block';
+    list.innerHTML = pending.map(p => `<div class="post-item"><div class="post-item-content"><div class="post-item-text">${this.esc(p.rawContent)}</div><div class="post-item-meta">${p.date} ${p.time}</div></div><button class="btn-icon" onclick="app.removeSchedule('${p.id}')">✕</button></div>`).join('');
   }
 
-  async removeScheduled(id) {
+  async removeSchedule(id) {
     const { scheduledPosts = [] } = await chrome.storage.local.get('scheduledPosts');
     await chrome.storage.local.set({ scheduledPosts: scheduledPosts.filter(p => p.id !== id) });
     chrome.alarms.clear(`post_${id}`);
-    this.loadScheduledPosts();
-    this.showToast(I18N.t('templateDeleted'), 'success');
+    this.loadSchedule();
   }
 
-  getRepeatLabel(repeat) {
-    return I18N.t('repeat' + repeat.charAt(0).toUpperCase() + repeat.slice(1)) || repeat;
+
+  // === AUTO LIKE ===
+  bindAutoLike() {
+    document.getElementById('startAutoLike').addEventListener('click', () => this.startAutoLike());
+    document.getElementById('stopAutoLike').addEventListener('click', () => { AutoLike.stop(); this.toggleBtn('startAutoLike', 'stopAutoLike', false); });
   }
 
-  // === TEMPLATES TAB ===
-  bindTemplates() {
-    document.getElementById('saveTemplate').addEventListener('click', () => this.saveTemplate());
+  async startAutoLike() {
+    this.toggleBtn('startAutoLike', 'stopAutoLike', true);
+    document.getElementById('likeProgress').style.display = 'block';
+    const res = await AutoLike.likeFeedPosts({
+      targetUrl: document.getElementById('likeTargetUrl').value || null,
+      maxLikes: parseInt(document.getElementById('maxLikes').value),
+      delayMin: parseInt(document.getElementById('likeDelayMin').value),
+      delayMax: parseInt(document.getElementById('likeDelayMax').value),
+      likeType: document.getElementById('likeType').value
+    });
+    this.toggleBtn('startAutoLike', 'stopAutoLike', false);
+    this.toast(`${res?.liked || 0} likes effectues!`, 'success');
+  }
+
+  // === AUTO COMMENT ===
+  bindAutoComment() {
+    document.getElementById('startAutoComment').addEventListener('click', () => this.startAutoComment());
+    document.getElementById('stopAutoComment').addEventListener('click', () => { AutoComment.stop(); this.toggleBtn('startAutoComment', 'stopAutoComment', false); });
+    document.getElementById('commentPromoMode').addEventListener('change', e => {
+      document.getElementById('promoLinkGroup').style.display = e.target.checked ? 'block' : 'none';
+    });
+  }
+
+  async startAutoComment() {
+    const templates = document.getElementById('commentTemplates').value.split('\n').filter(l => l.trim());
+    if (templates.length === 0) return this.toast('Ajoutez des templates', 'error');
+    this.toggleBtn('startAutoComment', 'stopAutoComment', true);
+    const res = await AutoComment.commentOnPosts({
+      targetUrl: document.getElementById('commentTargetUrl').value || null,
+      maxComments: parseInt(document.getElementById('maxComments').value),
+      templates,
+      promoMode: document.getElementById('commentPromoMode').checked,
+      promoLink: document.getElementById('commentPromoLink').value,
+      useSpintax: document.getElementById('commentSpintax').checked
+    });
+    this.toggleBtn('startAutoComment', 'stopAutoComment', false);
+    this.toast(`${res?.commented || 0} commentaires!`, 'success');
+  }
+
+  // === GROUPS ===
+  bindGroups() {
+    document.getElementById('startGroupJoin').addEventListener('click', () => this.startGroupJoin());
+    document.getElementById('stopGroupJoin').addEventListener('click', () => { AutoGroupJoin.stop(); this.toggleBtn('startGroupJoin', 'stopGroupJoin', false); });
+  }
+
+  async startGroupJoin() {
+    const urlsText = document.getElementById('groupUrls').value.trim();
+    const keywords = document.getElementById('groupKeywords').value.trim();
     
-    // Quick templates
-    document.querySelectorAll('.quick-templates button').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const category = btn.dataset.category;
-        const template = ContentEnhancer.getQuickTemplate(category);
-        document.getElementById('postContent').value = template;
-        document.getElementById('charCount').textContent = template.length;
-        document.querySelectorAll('.tab')[0].click(); // Switch to compose
-        this.showToast('Template loaded!', 'success');
+    this.toggleBtn('startGroupJoin', 'stopGroupJoin', true);
+    document.getElementById('groupProgress').style.display = 'block';
+
+    if (urlsText) {
+      const urls = AutoGroupJoin.parseGroupUrls(urlsText);
+      const res = await AutoGroupJoin.bulkJoin(urls, {
+        maxPerSession: parseInt(document.getElementById('maxGroupJoin').value),
+        answerQuestions: document.getElementById('answerGroupQuestions').checked
       });
+      const joined = res.filter(r => r.success).length;
+      this.toast(`${joined}/${res.length} groupes rejoints!`, 'success');
+    } else if (keywords) {
+      const kws = keywords.split(',').map(k => k.trim()).filter(k => k);
+      const res = await AutoGroupJoin.searchAndJoin(kws, { maxGroups: parseInt(document.getElementById('maxGroupJoin').value) });
+      this.toast(`${res.filter(r => r.joined).length} groupes rejoints!`, 'success');
+    } else {
+      this.toast('Ajoutez des URLs ou mots-cles', 'error');
+    }
+
+    this.toggleBtn('startGroupJoin', 'stopGroupJoin', false);
+    this.loadJoinedGroups();
+  }
+
+  async loadJoinedGroups() {
+    const groups = await AutoGroupJoin.getJoinedGroups();
+    const list = document.getElementById('joinedGroupsList');
+    if (groups.length === 0) { list.innerHTML = '<p style="font-size:11px;color:#65676b">Aucun groupe</p>'; return; }
+    list.innerHTML = groups.slice(0, 10).map(g => `<div class="post-item"><div class="post-item-content"><div class="post-item-text">${this.esc(g.name || g.url)}</div><div class="post-item-meta">${g.joinedAt ? new Date(g.joinedAt).toLocaleDateString() : ''}</div></div></div>`).join('');
+  }
+
+  // === MEMBERS EXTRACTION ===
+  bindMembers() {
+    document.getElementById('startExtraction').addEventListener('click', () => this.startExtraction());
+    document.getElementById('stopExtraction').addEventListener('click', () => { MemberExtractor.stop(); this.toggleBtn('startExtraction', 'stopExtraction', false); });
+    document.getElementById('exportMembersCSV').addEventListener('click', () => this.exportMembers('csv'));
+    document.getElementById('exportMembersJSON').addEventListener('click', () => this.exportMembers('json'));
+    document.getElementById('sendFriendToExtracted').addEventListener('click', () => this.sendFriendToExtracted());
+  }
+
+  async startExtraction() {
+    const url = document.getElementById('extractGroupUrl').value.trim();
+    if (!url) return this.toast('Entrez l\'URL du groupe', 'error');
+    this.toggleBtn('startExtraction', 'stopExtraction', true);
+    document.getElementById('extractProgress').style.display = 'block';
+
+    const type = document.getElementById('extractType').value;
+    let res;
+    if (type === 'active') res = await MemberExtractor.extractActiveMembers(url, { maxPosts: 20 });
+    else if (type === 'admins') res = await MemberExtractor.extractAdmins(url);
+    else res = await MemberExtractor.extractMembers(url, { maxMembers: parseInt(document.getElementById('maxMembers').value) });
+
+    this.toggleBtn('startExtraction', 'stopExtraction', false);
+    this.toast(`${res?.total || 0} membres extraits!`, 'success');
+    this.loadExtractions();
+  }
+
+  async loadExtractions() {
+    const extractions = await MemberExtractor.getExtractions();
+    const list = document.getElementById('extractionsList');
+    if (extractions.length === 0) { list.innerHTML = '<p style="font-size:11px;color:#65676b">Aucune extraction</p>'; return; }
+    list.innerHTML = extractions.slice(0, 5).map(e => `<div class="post-item"><div class="post-item-content"><div class="post-item-text">${this.esc(e.groupName)} (${e.memberCount} membres)</div><div class="post-item-meta">${new Date(e.extractedAt).toLocaleDateString()} | ${e.type}</div></div><button class="btn-icon" onclick="app.deleteExtraction('${e.id}')">✕</button></div>`).join('');
+  }
+
+  async exportMembers(format) {
+    const extractions = await MemberExtractor.getExtractions();
+    if (extractions.length === 0) return this.toast('Aucune extraction', 'error');
+    const data = await MemberExtractor.exportMembers(extractions[0].id, format);
+    if (!data) return;
+    const blob = new Blob([data], { type: format === 'csv' ? 'text/csv' : 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `members.${format}`; a.click();
+    URL.revokeObjectURL(url);
+    this.toast('Export reussi!', 'success');
+  }
+
+  async sendFriendToExtracted() {
+    const extractions = await MemberExtractor.getExtractions();
+    if (extractions.length === 0) return this.toast('Aucune extraction', 'error');
+    const urls = await MemberExtractor.exportProfileUrls(extractions[0].id);
+    document.getElementById('friendProfileUrls').value = urls.slice(0, 20).join('\n');
+    document.querySelectorAll('.tab')[7].click(); // Switch to friend tab
+  }
+
+  async deleteExtraction(id) { await MemberExtractor.deleteExtraction(id); this.loadExtractions(); }
+
+
+  // === AUTO SHARE ===
+  bindAutoShare() {
+    document.getElementById('startAutoShare').addEventListener('click', () => this.startAutoShare());
+    document.getElementById('stopAutoShare').addEventListener('click', () => { AutoShare.stop(); this.toggleBtn('startAutoShare', 'stopAutoShare', false); });
+  }
+
+  async startAutoShare() {
+    const postUrl = document.getElementById('sharePostUrl').value.trim();
+    if (!postUrl) return this.toast('Entrez l\'URL du post', 'error');
+    const groupUrls = document.getElementById('shareGroupUrls').value.split('\n').map(l => l.trim()).filter(l => l.includes('facebook.com'));
+    if (groupUrls.length === 0) return this.toast('Ajoutez des groupes', 'error');
+
+    this.toggleBtn('startAutoShare', 'stopAutoShare', true);
+    document.getElementById('shareProgress').style.display = 'block';
+
+    const res = await AutoShare.shareToMultipleGroups(postUrl, groupUrls, {
+      caption: document.getElementById('shareCaption').value,
+      useSpintax: document.getElementById('shareSpintax').checked,
+      addEmoji: document.getElementById('shareEmoji').checked,
+      delayMin: parseInt(document.getElementById('shareDelay').value),
+      delayMax: parseInt(document.getElementById('shareDelay').value) * 2
+    });
+
+    this.toggleBtn('startAutoShare', 'stopAutoShare', false);
+    const shared = res.filter(r => r.success).length;
+    this.toast(`${shared}/${res.length} partages reussis!`, 'success');
+  }
+
+  // === AUTO FRIEND ===
+  bindAutoFriend() {
+    document.getElementById('startAutoFriend').addEventListener('click', () => this.startAutoFriend());
+    document.getElementById('stopAutoFriend').addEventListener('click', () => { AutoFriend.stop(); this.toggleBtn('startAutoFriend', 'stopAutoFriend', false); });
+    document.getElementById('friendSource').addEventListener('change', e => {
+      document.getElementById('friendUrlsGroup').style.display = (e.target.value === 'urls' || e.target.value === 'extraction') ? 'block' : 'none';
+      document.getElementById('friendGroupUrlGroup').style.display = e.target.value === 'group' ? 'block' : 'none';
+    });
+    document.getElementById('sendIntroMessage').addEventListener('change', e => {
+      document.getElementById('introMessageGroup').style.display = e.target.checked ? 'block' : 'none';
     });
   }
 
-  async saveTemplate() {
-    const name = document.getElementById('templateName').value.trim();
-    const category = document.getElementById('templateCategory').value;
-    const content = document.getElementById('templateContent').value.trim();
-    
-    if (!name || !content) { this.showToast(I18N.t('writeContent'), 'error'); return; }
+  async startAutoFriend() {
+    const source = document.getElementById('friendSource').value;
+    const max = parseInt(document.getElementById('maxFriendRequests').value);
+    const sendMsg = document.getElementById('sendIntroMessage').checked;
+    const msgTemplate = document.getElementById('introMessage').value;
 
-    const { templates = [] } = await chrome.storage.local.get('templates');
-    templates.push({ id: Date.now().toString(), name, category, content, createdAt: new Date().toISOString() });
-    await chrome.storage.local.set({ templates });
+    this.toggleBtn('startAutoFriend', 'stopAutoFriend', true);
+    document.getElementById('friendProgress').style.display = 'block';
 
-    document.getElementById('templateName').value = '';
-    document.getElementById('templateContent').value = '';
-    this.showToast(I18N.t('templateSaved'), 'success');
-    this.loadTemplates();
-  }
-
-  async loadTemplates() {
-    const { templates = [] } = await chrome.storage.local.get('templates');
-    const list = document.getElementById('templateList');
-    
-    if (templates.length === 0) {
-      list.innerHTML = `<div class="empty-state"><p>${I18N.t('noTemplates')}</p></div>`;
-      return;
+    let res;
+    if (source === 'urls' || source === 'extraction') {
+      const urls = document.getElementById('friendProfileUrls').value.split('\n').map(l => l.trim()).filter(l => l.includes('facebook.com'));
+      if (urls.length === 0) { this.toggleBtn('startAutoFriend', 'stopAutoFriend', false); return this.toast('Ajoutez des URLs', 'error'); }
+      res = await AutoFriend.bulkSendRequests(urls, { maxPerSession: max, sendMessage: sendMsg, messageTemplate: msgTemplate });
+    } else if (source === 'group') {
+      const groupUrl = document.getElementById('friendGroupUrl').value.trim();
+      if (!groupUrl) { this.toggleBtn('startAutoFriend', 'stopAutoFriend', false); return this.toast('Entrez l\'URL du groupe', 'error'); }
+      res = await AutoFriend.sendToGroupMembers(groupUrl, { maxRequests: max, sendMessage: sendMsg, messageTemplate: msgTemplate });
+    } else if (source === 'suggested') {
+      res = await AutoFriend.sendToSuggested({ maxRequests: max });
     }
 
-    list.innerHTML = templates.map(t => `
-      <div class="post-item">
-        <div class="post-item-content">
-          <div class="post-item-text"><strong>${this.escapeHtml(t.name)}</strong></div>
-          <div class="post-item-meta">${t.category} | ${this.escapeHtml(t.content.substring(0, 40))}...</div>
-        </div>
-        <div class="post-item-actions">
-          <button onclick="app.useTemplate('${t.id}')" title="${I18N.t('useTemplate')}">📋</button>
-          <button onclick="app.deleteTemplate('${t.id}')" title="${I18N.t('delete')}">✕</button>
-        </div>
-      </div>
-    `).join('');
+    this.toggleBtn('startAutoFriend', 'stopAutoFriend', false);
+    const sent = Array.isArray(res) ? res.filter(r => r.success).length : (res?.sent || 0);
+    this.toast(`${sent} demandes envoyees!`, 'success');
   }
 
-  async useTemplate(id) {
-    const { templates = [] } = await chrome.storage.local.get('templates');
-    const template = templates.find(t => t.id === id);
-    if (template) {
-      document.getElementById('postContent').value = template.content;
-      document.getElementById('charCount').textContent = template.content.length;
-      document.querySelectorAll('.tab')[0].click();
-    }
+  // === CAMPAIGNS ===
+  bindCampaigns() {
+    document.getElementById('createCampaign').addEventListener('click', () => this.createCampaign());
   }
 
-  async deleteTemplate(id) {
-    const { templates = [] } = await chrome.storage.local.get('templates');
-    await chrome.storage.local.set({ templates: templates.filter(t => t.id !== id) });
-    this.loadTemplates();
-    this.showToast(I18N.t('templateDeleted'), 'success');
+  async createCampaign() {
+    const name = document.getElementById('campaignName').value.trim();
+    const productName = document.getElementById('productName').value.trim();
+    if (!name || !productName) return this.toast('Remplissez le nom et produit', 'error');
+
+    const campaign = await PromotionEngine.createCampaign({
+      name,
+      productName,
+      productUrl: document.getElementById('productUrl').value,
+      productDescription: document.getElementById('productDescription').value,
+      targetGroups: document.getElementById('campaignGroups').value.split('\n').map(l => l.trim()).filter(l => l),
+      language: document.getElementById('campaignLang').value,
+      options: {
+        autoPost: document.getElementById('campAutoPost').checked,
+        autoComment: document.getElementById('campAutoComment').checked,
+        autoLike: document.getElementById('campAutoLike').checked,
+        autoShare: document.getElementById('campAutoShare').checked,
+        autoFriend: document.getElementById('campAutoFriend').checked
+      }
+    });
+
+    this.toast('Campagne creee!', 'success');
+    document.getElementById('campaignName').value = '';
+    document.getElementById('productName').value = '';
+    this.loadCampaigns();
   }
 
-  // === BULK POSTING TAB ===
+  async loadCampaigns() {
+    const campaigns = await PromotionEngine.getCampaigns();
+    const list = document.getElementById('campaignsList');
+    if (campaigns.length === 0) { list.innerHTML = '<p style="font-size:11px;color:#65676b">Aucune campagne</p>'; return; }
+    list.innerHTML = campaigns.map(c => `<div class="post-item"><div class="post-item-content"><div class="post-item-text"><strong>${this.esc(c.name)}</strong> - ${this.esc(c.productName)}</div><div class="post-item-meta">${c.status} | Posts:${c.stats.posts} Likes:${c.stats.likes} Comments:${c.stats.comments}</div></div><div class="post-item-actions"><button onclick="app.runCampaign('${c.id}')" title="Lancer">▶</button><button onclick="app.deleteCampaign('${c.id}')" title="Supprimer">✕</button></div></div>`).join('');
+  }
+
+  async runCampaign(id) {
+    this.toast('Campagne en cours...', 'success');
+    const res = await PromotionEngine.runCampaign(id);
+    if (res.success) this.toast(`Campagne terminee! Posts:${res.results.posts} Likes:${res.results.likes}`, 'success');
+    else this.toast('Erreur: ' + res.error, 'error');
+    this.loadCampaigns();
+  }
+
+  async deleteCampaign(id) { await PromotionEngine.deleteCampaign(id); this.loadCampaigns(); }
+
+  // === BULK ===
   bindBulk() {
-    const bulkContent = document.getElementById('bulkContent');
-    bulkContent.addEventListener('input', () => {
-      const lines = bulkContent.value.split('\n').filter(l => l.trim());
-      document.getElementById('bulkCount').textContent = lines.length;
+    document.getElementById('bulkContent').addEventListener('input', e => {
+      document.getElementById('bulkCount').textContent = e.target.value.split('\n').filter(l => l.trim()).length;
     });
-
-    document.getElementById('importCSVBtn').addEventListener('click', () => {
-      document.getElementById('fileImport').accept = '.csv';
-      document.getElementById('fileImport').click();
-    });
-    document.getElementById('importTXTBtn').addEventListener('click', () => {
-      document.getElementById('fileImport').accept = '.txt';
-      document.getElementById('fileImport').click();
-    });
-    document.getElementById('fileImport').addEventListener('change', (e) => this.handleFileImport(e));
+    document.getElementById('importCSVBtn').addEventListener('click', () => { document.getElementById('fileImport').accept = '.csv'; document.getElementById('fileImport').click(); });
+    document.getElementById('importTXTBtn').addEventListener('click', () => { document.getElementById('fileImport').accept = '.txt'; document.getElementById('fileImport').click(); });
+    document.getElementById('fileImport').addEventListener('change', e => this.handleFileImport(e));
     document.getElementById('startBulk').addEventListener('click', () => this.startBulk());
-    document.getElementById('stopBulk').addEventListener('click', () => this.stopBulk());
+    document.getElementById('stopBulk').addEventListener('click', () => { BulkPoster.stop(); this.toggleBtn('startBulk', 'stopBulk', false); });
   }
 
   handleFileImport(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
+    const file = e.target.files[0]; if (!file) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target.result;
-      let posts;
-      if (file.name.endsWith('.csv')) {
-        posts = BulkPoster.parseCSV(text);
-      } else {
-        posts = BulkPoster.parseTXT(text);
-      }
+    reader.onload = ev => {
+      const posts = file.name.endsWith('.csv') ? BulkPoster.parseCSV(ev.target.result) : BulkPoster.parseTXT(ev.target.result);
       document.getElementById('bulkContent').value = posts.join('\n');
       document.getElementById('bulkCount').textContent = posts.length;
-      this.showToast(`${I18N.t('importSuccess')} (${posts.length} posts)`, 'success');
+      this.toast(`${posts.length} posts importes`, 'success');
     };
     reader.readAsText(file);
   }
 
   async startBulk() {
-    const content = document.getElementById('bulkContent').value.trim();
-    if (!content) { this.showToast(I18N.t('writeContent'), 'error'); return; }
-
-    const posts = content.split('\n').filter(l => l.trim());
-    const interval = parseInt(document.getElementById('bulkInterval').value) || 10;
-
-    const result = await BulkPoster.start(posts, {
-      intervalMin: interval,
-      intervalMax: interval * 2,
+    const posts = document.getElementById('bulkContent').value.split('\n').filter(l => l.trim());
+    if (posts.length === 0) return this.toast('Ajoutez des posts', 'error');
+    this.toggleBtn('startBulk', 'stopBulk', true);
+    document.getElementById('bulkProgress').style.display = 'block';
+    await BulkPoster.start(posts, {
+      intervalMin: parseInt(document.getElementById('bulkInterval').value),
+      intervalMax: parseInt(document.getElementById('bulkInterval').value) * 2,
       useSpintax: document.getElementById('bulkSpintax').checked,
       addEmoji: document.getElementById('bulkEmoji').checked,
       addHashtags: document.getElementById('bulkHashtags').checked
     });
-
-    if (result.success) {
-      this.showToast(I18N.t('bulkStarted'), 'success');
-      document.getElementById('startBulk').style.display = 'none';
-      document.getElementById('stopBulk').style.display = 'flex';
-      document.getElementById('bulkProgress').style.display = 'block';
-      this.updateBulkProgress();
-    }
+    this.toast('Bulk demarre!', 'success');
   }
 
-  async stopBulk() {
-    await BulkPoster.stop();
-    document.getElementById('startBulk').style.display = 'flex';
-    document.getElementById('stopBulk').style.display = 'none';
-    this.showToast(I18N.t('bulkStopped'), 'success');
-  }
-
-  async updateBulkProgress() {
-    const status = await BulkPoster.getStatus();
-    if (!status.isRunning) {
-      document.getElementById('startBulk').style.display = 'flex';
-      document.getElementById('stopBulk').style.display = 'none';
-      return;
-    }
-
-    const progress = status.total > 0 ? (status.current / status.total) * 100 : 0;
-    document.getElementById('progressFill').style.width = progress + '%';
-    document.getElementById('progressText').textContent = 
-      `${status.current}/${status.total} (${status.completed || 0} OK, ${status.failed || 0} fail)`;
-    
-    setTimeout(() => this.updateBulkProgress(), 5000);
-  }
-
-  // === ANALYTICS TAB ===
+  // === ANALYTICS ===
   bindAnalytics() {
-    document.getElementById('exportAnalytics').addEventListener('click', () => this.exportAnalytics());
-    document.getElementById('resetAnalytics').addEventListener('click', () => this.resetAnalytics());
+    document.getElementById('exportAnalytics').addEventListener('click', async () => {
+      const csv = await Analytics.exportData('csv');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'analytics.csv'; a.click();
+    });
+    document.getElementById('resetAnalytics').addEventListener('click', async () => { await Analytics.resetData(); this.loadAnalytics(); });
   }
 
   async loadAnalytics() {
@@ -426,183 +428,47 @@ class FacebookAutoPoster {
     const week = await Analytics.getStats('week');
     const month = await Analytics.getStats('month');
     const all = await Analytics.getStats('all');
-    
     document.getElementById('statToday').textContent = today.total;
     document.getElementById('statWeek').textContent = week.total;
     document.getElementById('statMonth').textContent = month.total;
     document.getElementById('statRate').textContent = all.successRate + '%';
 
-    // Best times
-    const bestTimes = await Analytics.getBestPostingTimes();
-    const btContainer = document.getElementById('bestTimesDisplay');
-    if (bestTimes.bestHours.length > 0) {
-      btContainer.innerHTML = bestTimes.bestHours
-        .filter(h => h.count > 0)
-        .map(h => `<span class="time-badge">${h.hour}:00 (${h.count})</span>`)
-        .join('');
-    } else {
-      btContainer.innerHTML = '<span style="font-size:11px;color:#65676b">Pas assez de donnees</span>';
-    }
+    // Load likes/comments/shares stats
+    const likeStats = await AutoLike.getStats();
+    const commentStats = await AutoComment.getStats();
+    const shareStats = await AutoShare.getStats();
+    document.getElementById('statLikes').textContent = likeStats.total || 0;
+    document.getElementById('statComments').textContent = commentStats.total || 0;
+    document.getElementById('statShares').textContent = shareStats.total || 0;
 
-    // Activity chart
+    // Chart
     const chartData = await Analytics.getActivityData(14);
     this.drawChart(chartData);
 
     // Insights
     const insights = await Analytics.getInsights();
-    const insightsContainer = document.getElementById('insightsList');
-    insightsContainer.innerHTML = insights.map(i => 
-      `<div class="insight-item ${i.type}">${i.text}</div>`
-    ).join('');
+    document.getElementById('insightsList').innerHTML = insights.map(i => `<div class="insight-item ${i.type}">${i.text}</div>`).join('');
   }
 
   drawChart(data) {
     const canvas = document.getElementById('activityChart');
     const ctx = canvas.getContext('2d');
-    const width = canvas.width;
-    const height = canvas.height;
-    
-    ctx.clearRect(0, 0, width, height);
-    
-    if (data.length === 0) return;
-    
-    const maxVal = Math.max(...data.map(d => d.total), 1);
-    const barWidth = (width - 20) / data.length;
-    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!data.length) return;
+    const max = Math.max(...data.map(d => d.total), 1);
+    const bw = (canvas.width - 10) / data.length;
     data.forEach((d, i) => {
-      const barHeight = (d.total / maxVal) * (height - 30);
-      const x = 10 + i * barWidth;
-      const y = height - barHeight - 20;
-      
-      // Success bar
-      const successHeight = d.total > 0 ? (d.success / d.total) * barHeight : 0;
-      ctx.fillStyle = '#4CAF50';
-      ctx.fillRect(x + 2, y + (barHeight - successHeight), barWidth - 4, successHeight);
-      
-      // Failed bar
-      const failedHeight = barHeight - successHeight;
-      if (failedHeight > 0) {
-        ctx.fillStyle = '#ff4444';
-        ctx.fillRect(x + 2, y, barWidth - 4, failedHeight);
-      }
-      
-      // Label
-      if (i % 2 === 0) {
-        ctx.fillStyle = '#65676b';
-        ctx.font = '9px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(d.label, x + barWidth / 2, height - 5);
-      }
+      const h = (d.total / max) * (canvas.height - 20);
+      ctx.fillStyle = d.failed > 0 ? '#ff4444' : '#4CAF50';
+      ctx.fillRect(5 + i * bw + 1, canvas.height - h - 15, bw - 2, h);
+      if (i % 3 === 0) { ctx.fillStyle = '#999'; ctx.font = '8px Arial'; ctx.textAlign = 'center'; ctx.fillText(d.label, 5 + i * bw + bw/2, canvas.height - 3); }
     });
   }
 
-  async exportAnalytics() {
-    const csv = await Analytics.exportData('csv');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'autoposter-analytics.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-    this.showToast(I18N.t('exportSuccess'), 'success');
-  }
-
-  async resetAnalytics() {
-    if (confirm('Reset all analytics data?')) {
-      await Analytics.resetData();
-      this.loadAnalytics();
-    }
-  }
-
-  // === ACCOUNTS TAB ===
-  bindAccounts() {
-    document.getElementById('addAccountBtn').addEventListener('click', () => this.addAccount());
-  }
-
-  async addAccount() {
-    const name = document.getElementById('accountName').value.trim();
-    const type = document.getElementById('accountType').value;
-    const url = document.getElementById('accountUrl').value.trim();
-    
-    if (!name || !url) { this.showToast(I18N.t('writeContent'), 'error'); return; }
-
-    await AccountManager.addAccount({ name, type, url });
-    document.getElementById('accountName').value = '';
-    document.getElementById('accountUrl').value = '';
-    this.showToast(I18N.t('accountAdded'), 'success');
-    this.loadAccounts();
-  }
-
-  async loadAccounts() {
-    const accounts = await AccountManager.getAccounts();
-    const list = document.getElementById('accountsList');
-    
-    if (accounts.length === 0) {
-      list.innerHTML = `<div class="empty-state"><p>${I18N.t('noAccounts')}</p></div>`;
-      return;
-    }
-
-    list.innerHTML = accounts.map(a => `
-      <div class="account-item">
-        <div class="account-info">
-          <div>
-            <span class="account-name">${this.escapeHtml(a.name)}</span>
-            <span class="account-type-badge">${a.type}</span>
-          </div>
-          <div class="account-url">${this.escapeHtml(a.url)}</div>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <button class="account-toggle ${a.isActive ? 'active' : ''}" onclick="app.toggleAccount('${a.id}')"></button>
-          <button style="background:none;border:none;cursor:pointer;color:#ff4444" onclick="app.deleteAccount('${a.id}')">✕</button>
-        </div>
-      </div>
-    `).join('');
-  }
-
-  async toggleAccount(id) {
-    await AccountManager.toggleAccount(id);
-    this.loadAccounts();
-  }
-
-  async deleteAccount(id) {
-    await AccountManager.deleteAccount(id);
-    this.loadAccounts();
-    this.showToast(I18N.t('accountDeleted'), 'success');
-  }
-
-  // === HISTORY TAB ===
-  async loadHistory() {
-    const { postHistory = [] } = await chrome.storage.local.get('postHistory');
-    const list = document.getElementById('historyList');
-    
-    document.getElementById('totalPosts').textContent = postHistory.length;
-    document.getElementById('successPosts').textContent = postHistory.filter(p => p.status === 'success').length;
-    document.getElementById('failedPosts').textContent = postHistory.filter(p => p.status === 'failed').length;
-
-    if (postHistory.length === 0) {
-      list.innerHTML = `<div class="empty-state"><p>${I18N.t('noHistory')}</p></div>`;
-      return;
-    }
-
-    list.innerHTML = postHistory.slice(0, 20).map(post => `
-      <div class="post-item">
-        <div class="post-item-content">
-          <div class="post-item-text">${this.escapeHtml(post.content)}</div>
-          <div class="post-item-meta">${this.formatDate(post.timestamp)}</div>
-        </div>
-        <span class="post-item-status ${post.status}">${post.status === 'success' ? I18N.t('success') : I18N.t('failedStatus')}</span>
-      </div>
-    `).join('');
-  }
-
-  // === SETTINGS TAB ===
+  // === SETTINGS ===
   bindSettings() {
     document.getElementById('saveSettings').addEventListener('click', () => this.saveSettings());
-    document.getElementById('languageSelect').addEventListener('change', (e) => {
-      I18N.setLang(e.target.value);
-      this.applyTranslations();
-    });
+    document.getElementById('languageSelect').addEventListener('change', e => { I18N.setLang(e.target.value); });
     this.loadSettings();
   }
 
@@ -618,105 +484,55 @@ class FacebookAutoPoster {
       humanMode: document.getElementById('humanMode').checked,
       randomScrolling: document.getElementById('randomScrolling').checked,
       randomPause: document.getElementById('randomPause').checked,
-      fingerprint: document.getElementById('fingerprint').checked,
-      autoReplyEnabled: document.getElementById('autoReplyEnabled').checked,
-      replyDelay: parseInt(document.getElementById('replyDelay').value),
-      watermarkText: document.getElementById('watermarkText').value,
-      watermarkPosition: document.getElementById('watermarkPosition').value
+      fingerprint: document.getElementById('fingerprint').checked
     };
-
     await chrome.storage.local.set({ settings });
-    
-    // Configure auto-reply
-    await AutoReply.configure({
-      enabled: settings.autoReplyEnabled,
-      delay: settings.replyDelay,
-      language: I18N.currentLang
-    });
-
-    // Configure watermark
-    await Watermark.saveConfig({
-      enabled: !!settings.watermarkText,
-      text: settings.watermarkText,
-      position: settings.watermarkPosition
-    });
-
-    this.showToast(I18N.t('settingsSaved'), 'success');
+    this.toast('Parametres sauvegardes!', 'success');
   }
 
   async loadSettings() {
     const { settings } = await chrome.storage.local.get('settings');
-    if (settings) {
-      document.getElementById('delayMin').value = settings.delayMin || 5;
-      document.getElementById('delayMax').value = settings.delayMax || 15;
-      document.getElementById('randomDelay').checked = settings.randomDelay !== false;
-      document.getElementById('notifySuccess').checked = settings.notifySuccess !== false;
-      document.getElementById('notifyError').checked = settings.notifyError !== false;
-      document.getElementById('autoRetry').checked = settings.autoRetry || false;
-      document.getElementById('maxRetries').value = settings.maxRetries || 3;
-      document.getElementById('humanMode').checked = settings.humanMode !== false;
-      document.getElementById('randomScrolling').checked = settings.randomScrolling || false;
-      document.getElementById('randomPause').checked = settings.randomPause !== false;
-      document.getElementById('fingerprint').checked = settings.fingerprint || false;
-      document.getElementById('autoReplyEnabled').checked = settings.autoReplyEnabled || false;
-      document.getElementById('replyDelay').value = settings.replyDelay || 30;
-      document.getElementById('watermarkText').value = settings.watermarkText || '';
-      document.getElementById('watermarkPosition').value = settings.watermarkPosition || 'bottomRight';
-    }
+    if (!settings) return;
+    document.getElementById('delayMin').value = settings.delayMin || 5;
+    document.getElementById('delayMax').value = settings.delayMax || 15;
+    document.getElementById('randomDelay').checked = settings.randomDelay !== false;
+    document.getElementById('notifySuccess').checked = settings.notifySuccess !== false;
+    document.getElementById('notifyError').checked = settings.notifyError !== false;
+    document.getElementById('autoRetry').checked = settings.autoRetry || false;
+    document.getElementById('maxRetries').value = settings.maxRetries || 3;
+    document.getElementById('humanMode').checked = settings.humanMode !== false;
+    document.getElementById('randomScrolling').checked = settings.randomScrolling || false;
+    document.getElementById('randomPause').checked = settings.randomPause !== false;
+    document.getElementById('fingerprint').checked = settings.fingerprint || false;
   }
 
   // === STATUS ===
   async updateStatus() {
     const { isActive } = await chrome.storage.local.get('isActive');
-    const indicator = document.getElementById('statusIndicator');
-    const dot = indicator.querySelector('.status-dot');
-    const text = indicator.querySelector('.status-text');
-    
-    if (isActive) {
-      dot.classList.add('active');
-      text.textContent = I18N.t('active');
-    } else {
-      dot.classList.remove('active');
-      text.textContent = I18N.t('inactive');
-    }
+    const dot = document.querySelector('.status-dot');
+    const text = document.querySelector('.status-text');
+    if (isActive) { dot.classList.add('active'); text.textContent = 'Actif'; }
+    else { dot.classList.remove('active'); text.textContent = 'Inactif'; }
   }
 
-  // === LOAD ALL DATA ===
-  async loadData() {
-    this.loadScheduledPosts();
-    this.loadHistory();
-    this.loadTemplates();
-    this.loadAccounts();
-    this.loadAnalytics();
-  }
+  // === LOAD ALL ===
+  async loadData() { this.loadSchedule(); this.loadJoinedGroups(); this.loadExtractions(); this.loadCampaigns(); this.loadAnalytics(); }
 
   // === UTILITIES ===
-  showToast(message, type = 'info') {
-    let toast = document.querySelector('.toast');
-    if (!toast) {
-      toast = document.createElement('div');
-      toast.className = 'toast';
-      document.body.appendChild(toast);
-    }
-    toast.textContent = message;
-    toast.className = `toast ${type}`;
-    setTimeout(() => toast.classList.add('show'), 10);
-    setTimeout(() => toast.classList.remove('show'), 3000);
+  toast(msg, type = 'info') {
+    let t = document.querySelector('.toast');
+    if (!t) { t = document.createElement('div'); t.className = 'toast'; document.body.appendChild(t); }
+    t.textContent = msg; t.className = `toast ${type}`;
+    setTimeout(() => t.classList.add('show'), 10);
+    setTimeout(() => t.classList.remove('show'), 3000);
   }
 
-  escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text || '';
-    return div.innerHTML;
+  toggleBtn(showId, hideId, running) {
+    document.getElementById(showId).style.display = running ? 'none' : 'flex';
+    document.getElementById(hideId).style.display = running ? 'flex' : 'none';
   }
 
-  formatDate(isoString) {
-    const date = new Date(isoString);
-    return date.toLocaleDateString(I18N.currentLang === 'ar' ? 'ar-SA' : I18N.currentLang === 'en' ? 'en-US' : 'fr-FR', {
-      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
-    });
-  }
+  esc(text) { const d = document.createElement('div'); d.textContent = text || ''; return d.innerHTML; }
 }
 
-// Initialize
 const app = new FacebookAutoPoster();
