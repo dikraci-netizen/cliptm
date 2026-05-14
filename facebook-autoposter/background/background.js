@@ -1,10 +1,13 @@
-// Facebook Auto Poster Pro - Background Service Worker
+// Facebook Auto Poster Pro - Ultimate Edition - Background Service Worker
 
 // === ALARM HANDLER ===
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name.startsWith('post_')) {
     const postId = alarm.name.replace('post_', '');
     await executeScheduledPost(postId);
+  }
+  if (alarm.name === 'bulk_next') {
+    await executeBulkNext();
   }
 });
 
@@ -261,9 +264,50 @@ function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// === BULK POSTING ===
+async function executeBulkNext() {
+  const { bulkState = {} } = await chrome.storage.local.get('bulkState');
+  if (!bulkState.isRunning) return;
+
+  const currentIndex = bulkState.current || 0;
+  if (currentIndex >= (bulkState.posts || []).length) {
+    bulkState.isRunning = false;
+    await chrome.storage.local.set({ bulkState });
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: '../icons/icon128.png',
+      title: 'Facebook Auto Poster Pro',
+      message: `Bulk posting completed! ${bulkState.completed || 0} success, ${bulkState.failed || 0} failed`
+    });
+    return;
+  }
+
+  const content = bulkState.posts[currentIndex];
+  const result = await publishPost({
+    content,
+    target: bulkState.options?.target || 'timeline',
+    targetUrl: bulkState.options?.targetUrl || ''
+  });
+
+  if (result.success) {
+    bulkState.completed = (bulkState.completed || 0) + 1;
+  } else {
+    bulkState.failed = (bulkState.failed || 0) + 1;
+  }
+  bulkState.current = currentIndex + 1;
+  await chrome.storage.local.set({ bulkState });
+
+  // Schedule next
+  if (bulkState.current < bulkState.posts.length) {
+    const minDelay = (bulkState.options?.intervalMin || 5) * 60 * 1000;
+    const maxDelay = (bulkState.options?.intervalMax || 15) * 60 * 1000;
+    const delay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+    chrome.alarms.create('bulk_next', { when: Date.now() + delay });
+  }
+}
+
 // === INSTALLATION ===
 chrome.runtime.onInstalled.addListener(() => {
-  // Set default settings
   chrome.storage.local.get('settings', (data) => {
     if (!data.settings) {
       chrome.storage.local.set({
@@ -274,7 +318,13 @@ chrome.runtime.onInstalled.addListener(() => {
           notifySuccess: true,
           notifyError: true,
           autoRetry: false,
-          maxRetries: 3
+          maxRetries: 3,
+          humanMode: true,
+          randomScrolling: false,
+          randomPause: true,
+          fingerprint: false,
+          autoReplyEnabled: false,
+          replyDelay: 30
         }
       });
     }

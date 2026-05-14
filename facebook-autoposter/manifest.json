@@ -1,18 +1,20 @@
 {
   "manifest_version": 3,
-  "name": "Facebook Auto Poster Pro",
-  "version": "1.0.0",
-  "description": "Extension professionnelle pour programmer et publier automatiquement des posts sur Facebook",
+  "name": "Facebook Auto Poster Pro - Ultimate Edition",
+  "version": "2.0.0",
+  "description": "The #1 professional Facebook auto-posting tool. Schedule, bulk post, multi-account, analytics, AI content, Arabic/French/English support.",
   "permissions": [
     "storage",
     "alarms",
     "tabs",
     "activeTab",
-    "notifications"
+    "notifications",
+    "scripting"
   ],
   "host_permissions": [
     "https://www.facebook.com/*",
-    "https://m.facebook.com/*"
+    "https://m.facebook.com/*",
+    "https://business.facebook.com/*"
   ],
   "action": {
     "default_popup": "popup/popup.html",
@@ -27,14 +29,25 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://www.facebook.com/*", "https://m.facebook.com/*"],
+      "matches": [
+        "https://www.facebook.com/*",
+        "https://m.facebook.com/*",
+        "https://business.facebook.com/*"
+      ],
       "js": ["content/content.js"],
-      "css": ["content/content.css"]
+      "css": ["content/content.css"],
+      "run_at": "document_idle"
     }
   ],
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["lib/*"],
+      "matches": ["https://www.facebook.com/*"]
+    }
+  ]
 }
