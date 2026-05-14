@@ -774,3 +774,100 @@ h4 {
 [dir="rtl"] h3, [dir="rtl"] h4 {
   text-align: right;
 }
+
+
+
+/* === CONNECTION BANNER === */
+.connection-banner {
+  background: #fff3e0;
+  border-bottom: 1px solid #ffcc80;
+  padding: 10px 14px;
+  animation: slideDown 0.3s ease;
+}
+
+.connection-banner.connected {
+  background: #e8f5e9;
+  border-bottom-color: #a5d6a7;
+}
+
+.connection-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.connection-icon {
+  flex-shrink: 0;
+  color: #e65100;
+  display: flex;
+  align-items: center;
+}
+
+.connection-banner.connected .connection-icon {
+  color: #2e7d32;
+}
+
+.connection-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.connection-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e65100;
+}
+
+.connection-banner.connected .connection-text {
+  color: #2e7d32;
+}
+
+.connection-user {
+  font-size: 10px;
+  color: #65676b;
+}
+
+.btn-connect {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  background: #1877F2;
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-connect:hover {
+  background: #1565c0;
+  transform: translateY(-1px);
+}
+
+.connection-banner.connected .btn-connect {
+  background: #e4e6eb;
+  color: #1c1e21;
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* RTL support for connection banner */
+[dir="rtl"] .connection-banner-content {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .connection-info {
+  text-align: right;
+}
+
+[dir="rtl"] .btn-connect {
+  flex-direction: row-reverse;
+}

@@ -23,6 +23,27 @@
       </div>
     </header>
 
+    <!-- Connection Status Banner -->
+    <div class="connection-banner" id="connectionBanner" style="display:none">
+      <div class="connection-banner-content">
+        <div class="connection-icon" id="connectionIcon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 9v2m0 4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"/>
+          </svg>
+        </div>
+        <div class="connection-info">
+          <span class="connection-text" id="connectionText">Non connecte a Facebook</span>
+          <span class="connection-user" id="connectionUser"></span>
+        </div>
+        <button class="btn-connect" id="openFacebookBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
+          </svg>
+          <span id="connectBtnText">Ouvrir Facebook</span>
+        </button>
+      </div>
+    </div>
+
     <!-- Navigation Tabs -->
     <nav class="tabs">
       <button class="tab active" data-tab="compose">Composer</button>

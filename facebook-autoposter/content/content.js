@@ -13,7 +13,77 @@
       handleContentAction(message.data).then(sendResponse).catch(e => sendResponse({ success: false, error: e.message }));
       return true;
     }
+    if (message.action === 'checkLoginStatus') {
+      const status = checkLoginStatus();
+      sendResponse(status);
+      return false;
+    }
   });
+
+  // === LOGIN STATUS DETECTION ===
+  function checkLoginStatus() {
+    // Method 1: Check if login form is present (means NOT logged in)
+    const loginForm = document.querySelector('#login_form, [data-testid="royal_login_form"], form[action*="login"]');
+    if (loginForm) {
+      return { loggedIn: false };
+    }
+
+    // Method 2: Check URL for login/recovery pages
+    const url = window.location.href;
+    if (url.includes('/login') || url.includes('/recover') || url.includes('/checkpoint')) {
+      return { loggedIn: false };
+    }
+
+    // Method 3: Check for user navigation elements (present when logged in)
+    const userNav = document.querySelector(
+      '[aria-label="Your profile"], [aria-label="Votre profil"], [aria-label="ملفك الشخصي"], ' +
+      '[data-pagelet="ProfileTilesFeed"], [aria-label="Account"], [aria-label="Compte"]'
+    );
+
+    // Method 4: Check for the navigation bar (logged in users have it)
+    const navBar = document.querySelector('[role="navigation"], [data-pagelet="LeftRail"]');
+
+    // Method 5: Look for profile link/image
+    const profileLink = document.querySelector(
+      'a[href*="/me"], a[aria-label*="profile"], image[data-visualcompletion]'
+    );
+
+    // Method 6: Check for "Create Post" area (only visible when logged in)
+    const createPost = document.querySelector(
+      '[aria-label="Create a post"], [aria-label="Quoi de neuf"], [aria-label="ما الذي يدور في ذهنك"]'
+    );
+
+    const isLoggedIn = !!(userNav || navBar || profileLink || createPost);
+
+    // Try to extract username
+    let userName = '';
+    if (isLoggedIn) {
+      // Try multiple approaches to get the user name
+      const profileEl = document.querySelector(
+        '[aria-label="Your profile"] span, ' +
+        '[aria-label="Votre profil"] span, ' +
+        '[aria-label="ملفك الشخصي"] span, ' +
+        'a[href*="/me"] span'
+      );
+      if (profileEl) {
+        userName = profileEl.textContent.trim();
+      }
+
+      // Fallback: check the account settings link
+      if (!userName) {
+        const accountLink = document.querySelector('a[href*="/me"], [data-pagelet="ProfileTilesFeed"] a');
+        if (accountLink) {
+          userName = accountLink.textContent.trim().split('\n')[0];
+        }
+      }
+    }
+
+    return { 
+      loggedIn: isLoggedIn, 
+      userName: userName || '',
+      url: window.location.href
+    };
+  }
 
   // === ROUTER FOR ALL CONTENT ACTIONS ===
   async function handleContentAction(data) {

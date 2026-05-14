@@ -17,8 +17,119 @@ class FacebookAutoPoster {
     this.bindBulk();
     this.bindAnalytics();
     this.bindSettings();
+    this.bindConnection();
     this.loadData();
     this.updateStatus();
+    this.checkConnection();
+  }
+
+  // === CONNECTION CHECK ===
+  bindConnection() {
+    document.getElementById('openFacebookBtn').addEventListener('click', () => this.openFacebook());
+  }
+
+  async checkConnection() {
+    const banner = document.getElementById('connectionBanner');
+    const icon = document.getElementById('connectionIcon');
+    const text = document.getElementById('connectionText');
+    const user = document.getElementById('connectionUser');
+    const btn = document.getElementById('openFacebookBtn');
+    const btnText = document.getElementById('connectBtnText');
+
+    banner.style.display = 'block';
+
+    try {
+      const result = await chrome.runtime.sendMessage({ action: 'checkFacebookConnection' });
+
+      if (result && result.connected) {
+        // Connected
+        banner.classList.add('connected');
+        banner.classList.remove('disconnected');
+        icon.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+        
+        const lang = I18N.currentLang;
+        if (lang === 'ar') {
+          text.textContent = 'متصل بفيسبوك';
+          btnText.textContent = 'فتح فيسبوك';
+        } else if (lang === 'en') {
+          text.textContent = 'Connected to Facebook';
+          btnText.textContent = 'Open Facebook';
+        } else {
+          text.textContent = 'Connecte a Facebook';
+          btnText.textContent = 'Ouvrir Facebook';
+        }
+
+        if (result.userName) {
+          user.textContent = result.userName;
+          user.style.display = 'block';
+        } else {
+          user.style.display = 'none';
+        }
+
+        // Update status indicator too
+        const dot = document.querySelector('.status-dot');
+        const statusText = document.querySelector('.status-text');
+        dot.classList.add('active');
+        statusText.textContent = lang === 'ar' ? 'نشط' : lang === 'en' ? 'Active' : 'Actif';
+
+        // Hide banner after 3 seconds if connected
+        setTimeout(() => {
+          banner.style.display = 'none';
+        }, 3000);
+
+      } else {
+        // Not connected
+        banner.classList.remove('connected');
+        banner.classList.add('disconnected');
+        icon.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v2m0 4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"/></svg>';
+        
+        const lang = I18N.currentLang;
+        if (lang === 'ar') {
+          text.textContent = 'غير متصل بفيسبوك';
+          btnText.textContent = 'فتح فيسبوك';
+          user.textContent = 'يرجى تسجيل الدخول أولاً';
+        } else if (lang === 'en') {
+          text.textContent = 'Not connected to Facebook';
+          btnText.textContent = 'Open Facebook';
+          user.textContent = 'Please log in first';
+        } else {
+          text.textContent = 'Non connecte a Facebook';
+          btnText.textContent = 'Ouvrir Facebook';
+          user.textContent = 'Veuillez vous connecter d\'abord';
+        }
+        user.style.display = 'block';
+
+        // Keep banner visible
+        banner.style.display = 'block';
+      }
+    } catch (error) {
+      // Error checking - show disconnected state
+      banner.classList.remove('connected');
+      banner.style.display = 'block';
+      text.textContent = 'Verification en cours...';
+      user.textContent = '';
+    }
+
+    // Periodic re-check every 30 seconds
+    setTimeout(() => this.checkConnection(), 30000);
+  }
+
+  async openFacebook() {
+    try {
+      const result = await chrome.runtime.sendMessage({ action: 'openFacebook' });
+      if (result && result.success) {
+        const lang = I18N.currentLang;
+        if (result.action === 'created') {
+          this.toast(lang === 'ar' ? 'تم فتح فيسبوك - سجل الدخول' : lang === 'en' ? 'Facebook opened - please log in' : 'Facebook ouvert - connectez-vous', 'success');
+        } else {
+          this.toast(lang === 'ar' ? 'تم التركيز على تبويب فيسبوك' : lang === 'en' ? 'Facebook tab focused' : 'Onglet Facebook active', 'success');
+        }
+        // Re-check connection after a delay (user might be logging in)
+        setTimeout(() => this.checkConnection(), 5000);
+      }
+    } catch (error) {
+      this.toast('Error opening Facebook', 'error');
+    }
   }
 
   // === TABS ===

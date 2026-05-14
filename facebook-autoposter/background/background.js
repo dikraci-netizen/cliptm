@@ -37,7 +37,83 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     executeContentAction(message.data).then(sendResponse);
     return true;
   }
+
+  if (message.action === 'checkFacebookConnection') {
+    checkFacebookConnection().then(sendResponse);
+    return true;
+  }
+
+  if (message.action === 'openFacebook') {
+    openFacebookLogin().then(sendResponse);
+    return true;
+  }
 });
+
+// === FACEBOOK CONNECTION CHECK ===
+async function checkFacebookConnection() {
+  try {
+    // Check if there's a Facebook tab already open
+    const tabs = await chrome.tabs.query({ url: 'https://www.facebook.com/*' });
+    
+    if (tabs.length > 0) {
+      // Tab exists, check if user is logged in by sending message to content script
+      try {
+        const response = await chrome.tabs.sendMessage(tabs[0].id, {
+          action: 'checkLoginStatus'
+        });
+        
+        if (response && response.loggedIn) {
+          return { 
+            connected: true, 
+            tabId: tabs[0].id, 
+            userName: response.userName || '',
+            profilePic: response.profilePic || ''
+          };
+        }
+      } catch (e) {
+        // Content script not loaded yet, check URL
+        if (!tabs[0].url.includes('/login') && !tabs[0].url.includes('/recover')) {
+          return { connected: true, tabId: tabs[0].id, userName: '' };
+        }
+      }
+    }
+
+    // No Facebook tab or not logged in - try to check via cookies
+    try {
+      const cookie = await chrome.cookies.get({ url: 'https://www.facebook.com', name: 'c_user' });
+      if (cookie && cookie.value) {
+        return { connected: true, tabId: null, userName: '', userId: cookie.value };
+      }
+    } catch (e) {
+      // cookies permission might not be available
+    }
+
+    return { connected: false, tabId: null };
+  } catch (error) {
+    return { connected: false, error: error.message };
+  }
+}
+
+// === OPEN FACEBOOK LOGIN ===
+async function openFacebookLogin() {
+  try {
+    // Check if there's already a Facebook tab
+    const tabs = await chrome.tabs.query({ url: 'https://www.facebook.com/*' });
+    
+    if (tabs.length > 0) {
+      // Focus existing tab
+      await chrome.tabs.update(tabs[0].id, { active: true });
+      await chrome.windows.update(tabs[0].windowId, { focused: true });
+      return { success: true, tabId: tabs[0].id, action: 'focused' };
+    }
+    
+    // Create new tab
+    const newTab = await chrome.tabs.create({ url: 'https://www.facebook.com/', active: true });
+    return { success: true, tabId: newTab.id, action: 'created' };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
 
 // === EXECUTE CONTENT ACTION IN TAB ===
 async function executeContentAction(data) {
