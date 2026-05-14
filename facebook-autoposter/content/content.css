@@ -1,0 +1,44 @@
+/* Facebook Auto Poster Pro - Content Script Styles */
+/* Minimal injection - only for visual feedback during operations */
+
+.fbap-overlay {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: linear-gradient(135deg, #1877F2, #42a5f5);
+  color: white;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  z-index: 99999;
+  box-shadow: 0 4px 20px rgba(24, 119, 242, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: fbap-slideIn 0.3s ease;
+}
+
+@keyframes fbap-slideIn {
+  from {
+    transform: translateY(100px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.fbap-overlay .fbap-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: fbap-spin 1s linear infinite;
+}
+
+@keyframes fbap-spin {
+  to { transform: rotate(360deg); }
+}
