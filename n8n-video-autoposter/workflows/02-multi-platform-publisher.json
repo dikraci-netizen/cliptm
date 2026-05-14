@@ -1,0 +1,334 @@
+{
+  "name": "ClipTM - Multi-Platform Publisher",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cliptm-publish",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook-in",
+      "name": "Webhook (from main workflow)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-1600, 500]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "p1", "name": "title", "value": "={{ $json.body.title }}", "type": "string" },
+            { "id": "p2", "name": "description", "value": "={{ $json.body.description }}", "type": "string" },
+            { "id": "p3", "name": "hashtags", "value": "={{ $json.body.hashtags }}", "type": "array" },
+            { "id": "p4", "name": "youtube_tags", "value": "={{ $json.body.youtube_tags }}", "type": "array" },
+            { "id": "p5", "name": "video_path", "value": "={{ $json.body.video_path }}", "type": "string" },
+            { "id": "p6", "name": "video_id", "value": "={{ $json.body.video_id }}", "type": "string" },
+            { "id": "p7", "name": "language", "value": "={{ $json.body.language }}", "type": "string" },
+            { "id": "p8", "name": "social_caption", "value": "={{ $json.body.title + '\\n\\n' + $json.body.description + '\\n\\n' + ($json.body.hashtags || []).join(' ') }}", "type": "string" }
+          ]
+        }
+      },
+      "id": "set-payload",
+      "name": "Normalize Payload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-1380, 500]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "={{ $json.video_path }}",
+        "options": { "dataPropertyName": "video" }
+      },
+      "id": "read-video",
+      "name": "Read Video Binary",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [-1140, 500]
+    },
+    {
+      "parameters": {
+        "title": "={{ $json.title }}",
+        "regionCode": "FR",
+        "categoryId": "22",
+        "options": {
+          "description": "={{ $json.description + '\\n\\n' + ($json.hashtags || []).join(' ') }}",
+          "tags": "={{ ($json.youtube_tags || []).join(',') }}",
+          "privacyStatus": "public",
+          "madeForKids": false,
+          "notifySubscribers": true
+        },
+        "binaryProperty": "video"
+      },
+      "id": "youtube-upload",
+      "name": "YouTube Shorts - Upload",
+      "type": "n8n-nodes-base.youTube",
+      "typeVersion": 1,
+      "position": [-880, 100],
+      "credentials": {
+        "youTubeOAuth2Api": { "id": "youtube_oauth", "name": "YouTube OAuth2" }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v19.0/{{ $env.FB_PAGE_ID }}/videos",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "description", "value": "={{ $json.social_caption }}" },
+            { "name": "title", "value": "={{ $json.title }}" },
+            { "name": "source", "parameterType": "formBinaryData", "inputDataFieldName": "video" }
+          ]
+        },
+        "options": { "timeout": 300000 }
+      },
+      "id": "fb-upload",
+      "name": "Facebook Page - Reels/Video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-880, 260],
+      "credentials": {
+        "httpQueryAuth": { "id": "fb_token", "name": "Facebook Page Token (access_token)" }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v19.0/{{ $env.IG_USER_ID }}/media",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"media_type\": \"REELS\",\n  \"video_url\": \"{{ $env.PUBLIC_VIDEO_URL_BASE }}/{{ $('Normalize Payload').first().json.video_id }}.mp4\",\n  \"caption\": \"{{ $json.social_caption.replace(/\"/g,'\\\\\"') }}\",\n  \"share_to_feed\": true\n}",
+        "options": { "timeout": 60000 }
+      },
+      "id": "ig-create",
+      "name": "Instagram - Create Reel Container",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-880, 420],
+      "credentials": {
+        "httpQueryAuth": { "id": "ig_token", "name": "Instagram Graph Token" }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "amount": 30,
+        "unit": "seconds"
+      },
+      "id": "ig-wait",
+      "name": "Wait IG processing",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [-660, 420]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v19.0/{{ $env.IG_USER_ID }}/media_publish",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"creation_id\": \"{{ $json.id }}\"\n}"
+      },
+      "id": "ig-publish",
+      "name": "Instagram - Publish Reel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-440, 420],
+      "credentials": {
+        "httpQueryAuth": { "id": "ig_token", "name": "Instagram Graph Token" }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://open.tiktokapis.com/v2/post/publish/inbox/video/init/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"source_info\": {\n    \"source\": \"PULL_FROM_URL\",\n    \"video_url\": \"{{ $env.PUBLIC_VIDEO_URL_BASE }}/{{ $('Normalize Payload').first().json.video_id }}.mp4\"\n  }\n}"
+      },
+      "id": "tiktok-upload",
+      "name": "TikTok - Upload via URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-880, 580],
+      "credentials": {
+        "httpHeaderAuth": { "id": "tiktok_token", "name": "TikTok OAuth Bearer" }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.twitter.com/2/tweets",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth1Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": \"{{ ($('Normalize Payload').first().json.title + ' ' + ($('Normalize Payload').first().json.hashtags || []).slice(0,5).join(' ')).slice(0,275).replace(/\"/g,'\\\\\"') }}\"\n}"
+      },
+      "id": "x-tweet",
+      "name": "X / Twitter - Post (text+link)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-880, 740],
+      "credentials": {
+        "oAuth1Api": { "id": "x_oauth", "name": "X / Twitter OAuth1" }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "resource": "post",
+        "person": "={{ $env.LINKEDIN_PERSON_URN }}",
+        "text": "={{ $('Normalize Payload').first().json.social_caption }}",
+        "additionalFields": {}
+      },
+      "id": "linkedin-post",
+      "name": "LinkedIn - Post (with media)",
+      "type": "n8n-nodes-base.linkedIn",
+      "typeVersion": 1,
+      "position": [-880, 900],
+      "credentials": {
+        "linkedInOAuth2Api": { "id": "linkedin_oauth", "name": "LinkedIn OAuth2" }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Logs",
+          "mode": "list"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $now.toISO() }}",
+            "video_id": "={{ $('Normalize Payload').first().json.video_id }}",
+            "title": "={{ $('Normalize Payload').first().json.title }}",
+            "youtube_status": "={{ $('YouTube Shorts - Upload').isExecuted ? ($('YouTube Shorts - Upload').first().json.id ? 'OK:' + $('YouTube Shorts - Upload').first().json.id : 'FAIL') : 'SKIP' }}",
+            "facebook_status": "={{ $('Facebook Page - Reels/Video').isExecuted ? ($('Facebook Page - Reels/Video').first().json.id ? 'OK' : 'FAIL') : 'SKIP' }}",
+            "instagram_status": "={{ $('Instagram - Publish Reel').isExecuted ? ($('Instagram - Publish Reel').first().json.id ? 'OK' : 'FAIL') : 'SKIP' }}",
+            "tiktok_status": "={{ $('TikTok - Upload via URL').isExecuted ? 'OK' : 'SKIP' }}",
+            "x_status": "={{ $('X / Twitter - Post (text+link)').isExecuted ? 'OK' : 'SKIP' }}",
+            "linkedin_status": "={{ $('LinkedIn - Post (with media)').isExecuted ? 'OK' : 'SKIP' }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-log",
+      "name": "Google Sheets - Log Run",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [-180, 500],
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "google_sheets", "name": "Google Sheets" }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $env.TELEGRAM_CHAT_ID }}\",\n  \"parse_mode\": \"Markdown\",\n  \"text\": \"*ClipTM*  Nouvelle vidéo publiée\\n\\n*Titre:* {{ $('Normalize Payload').first().json.title }}\\n*ID:* `{{ $('Normalize Payload').first().json.video_id }}`\\n\\nYouTube: {{ $('YouTube Shorts - Upload').first().json.id ? '✅' : '❌' }}\\nFacebook: {{ $('Facebook Page - Reels/Video').first().json.id ? '✅' : '❌' }}\\nInstagram: {{ $('Instagram - Publish Reel').first().json.id ? '✅' : '❌' }}\\nTikTok: {{ $('TikTok - Upload via URL').first().json ? '✅' : '❌' }}\\nX: {{ $('X / Twitter - Post (text+link)').first().json ? '✅' : '❌' }}\\nLinkedIn: {{ $('LinkedIn - Post (with media)').first().json ? '✅' : '❌' }}\"\n}"
+      },
+      "id": "telegram-notify",
+      "name": "Telegram - Notify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [60, 500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"video_id\": \"{{ $('Normalize Payload').first().json.video_id }}\",\n  \"title\": \"{{ $('Normalize Payload').first().json.title }}\",\n  \"published\": true\n}"
+      },
+      "id": "respond",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [300, 500]
+    }
+  ],
+  "connections": {
+    "Webhook (from main workflow)": {
+      "main": [[{ "node": "Normalize Payload", "type": "main", "index": 0 }]]
+    },
+    "Normalize Payload": {
+      "main": [[{ "node": "Read Video Binary", "type": "main", "index": 0 }]]
+    },
+    "Read Video Binary": {
+      "main": [[
+        { "node": "YouTube Shorts - Upload", "type": "main", "index": 0 },
+        { "node": "Facebook Page - Reels/Video", "type": "main", "index": 0 },
+        { "node": "Instagram - Create Reel Container", "type": "main", "index": 0 },
+        { "node": "TikTok - Upload via URL", "type": "main", "index": 0 },
+        { "node": "X / Twitter - Post (text+link)", "type": "main", "index": 0 },
+        { "node": "LinkedIn - Post (with media)", "type": "main", "index": 0 }
+      ]]
+    },
+    "Instagram - Create Reel Container": {
+      "main": [[{ "node": "Wait IG processing", "type": "main", "index": 0 }]]
+    },
+    "Wait IG processing": {
+      "main": [[{ "node": "Instagram - Publish Reel", "type": "main", "index": 0 }]]
+    },
+    "YouTube Shorts - Upload": {
+      "main": [[{ "node": "Google Sheets - Log Run", "type": "main", "index": 0 }]]
+    },
+    "Facebook Page - Reels/Video": {
+      "main": [[{ "node": "Google Sheets - Log Run", "type": "main", "index": 0 }]]
+    },
+    "Instagram - Publish Reel": {
+      "main": [[{ "node": "Google Sheets - Log Run", "type": "main", "index": 0 }]]
+    },
+    "TikTok - Upload via URL": {
+      "main": [[{ "node": "Google Sheets - Log Run", "type": "main", "index": 0 }]]
+    },
+    "X / Twitter - Post (text+link)": {
+      "main": [[{ "node": "Google Sheets - Log Run", "type": "main", "index": 0 }]]
+    },
+    "LinkedIn - Post (with media)": {
+      "main": [[{ "node": "Google Sheets - Log Run", "type": "main", "index": 0 }]]
+    },
+    "Google Sheets - Log Run": {
+      "main": [[{ "node": "Telegram - Notify", "type": "main", "index": 0 }]]
+    },
+    "Telegram - Notify": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "timezone": "Europe/Paris"
+  },
+  "tags": [
+    { "name": "cliptm" },
+    { "name": "publishing" }
+  ]
+}

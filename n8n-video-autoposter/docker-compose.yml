@@ -1,0 +1,50 @@
+version: "3.8"
+
+services:
+  cliptm-n8n:
+    build: .
+    container_name: cliptm-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      # ---- n8n core ----
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
+      - WEBHOOK_URL=${WEBHOOK_URL:-http://localhost:5678/}
+      - GENERIC_TIMEZONE=${TZ:-Europe/Paris}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-changeme}
+      - N8N_DEFAULT_BINARY_DATA_MODE=filesystem
+      - NODE_FUNCTION_ALLOW_BUILTIN=fs,path,crypto
+
+      # ---- Video pipeline config ----
+      - VIDEO_NICHE=${VIDEO_NICHE:-productivity}
+      - VIDEO_KEYWORD=${VIDEO_KEYWORD:-morning routine}
+      - VIDEO_LANGUAGE=${VIDEO_LANGUAGE:-fr}
+      - VIDEO_DURATION=${VIDEO_DURATION:-45}
+      - VIDEO_VOICE=${VIDEO_VOICE:-fr-FR-DeniseNeural}
+
+      # ---- Social platform IDs ----
+      - FB_PAGE_ID=${FB_PAGE_ID}
+      - IG_USER_ID=${IG_USER_ID}
+      - LINKEDIN_PERSON_URN=${LINKEDIN_PERSON_URN}
+      - PUBLIC_VIDEO_URL_BASE=${PUBLIC_VIDEO_URL_BASE}
+
+      # ---- Notifications & logging ----
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - SHEET_ID=${SHEET_ID}
+
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./assets:/data/assets
+      - ./scripts:/data/scripts
+      - cliptm_tmp:/tmp/cliptm
+
+volumes:
+  n8n_data:
+  cliptm_tmp:

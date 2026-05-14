@@ -1,0 +1,10 @@
+.env
+*.log
+node_modules/
+__pycache__/
+*.pyc
+assets/music/*.mp3
+!assets/music/.gitkeep
+n8n_data/
+cliptm_tmp/
+.DS_Store

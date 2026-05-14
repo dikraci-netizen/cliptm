@@ -1,0 +1,458 @@
+{
+  "name": "ClipTM - AI Video Generator & Multi-Platform Publisher",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "trigger-cron",
+      "name": "Schedule Trigger (every 6h)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-1600, 400]
+    },
+    {
+      "parameters": {},
+      "id": "trigger-manual",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-1600, 600]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "niche",
+              "name": "niche",
+              "value": "={{ $env.VIDEO_NICHE || 'productivity' }}",
+              "type": "string"
+            },
+            {
+              "id": "keyword",
+              "name": "keyword",
+              "value": "={{ $env.VIDEO_KEYWORD || 'morning routine' }}",
+              "type": "string"
+            },
+            {
+              "id": "language",
+              "name": "language",
+              "value": "={{ $env.VIDEO_LANGUAGE || 'fr' }}",
+              "type": "string"
+            },
+            {
+              "id": "duration",
+              "name": "duration_seconds",
+              "value": "={{ $env.VIDEO_DURATION || 45 }}",
+              "type": "number"
+            },
+            {
+              "id": "format",
+              "name": "format",
+              "value": "vertical",
+              "type": "string"
+            },
+            {
+              "id": "video_id",
+              "name": "video_id",
+              "value": "={{ 'vid_' + Date.now() }}",
+              "type": "string"
+            },
+            {
+              "id": "voice",
+              "name": "voice",
+              "value": "={{ $env.VIDEO_VOICE || 'fr-FR-DeniseNeural' }}",
+              "type": "string"
+            },
+            {
+              "id": "work_dir",
+              "name": "work_dir",
+              "value": "/tmp/cliptm",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-config",
+      "name": "Configuration (niche/keyword/lang)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-1380, 500]
+    },
+    {
+      "parameters": {
+        "url": "=https://trends.google.com/trends/api/dailytrends?hl={{ $json.language }}&geo={{ $json.language === 'fr' ? 'FR' : 'US' }}&ns=15",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "http-trends",
+      "name": "Google Trends (free)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-1140, 500],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Google Trends response (it has a 5-char prefix to prevent JSON hijacking)\nconst raw = $input.first().json.data || $input.first().json;\nconst cfg = $('Configuration (niche/keyword/lang)').first().json;\nlet trends = [];\ntry {\n  const txt = typeof raw === 'string' ? raw : JSON.stringify(raw);\n  const cleaned = txt.replace(/^\\)\\]\\}'\\,?\\n?/, '');\n  const parsed = JSON.parse(cleaned);\n  trends = (parsed?.default?.trendingSearchesDays?.[0]?.trendingSearches || [])\n    .map(t => t.title?.query)\n    .filter(Boolean)\n    .slice(0, 10);\n} catch (e) {\n  trends = [];\n}\n\nreturn [{\n  json: {\n    ...cfg,\n    trends,\n    enriched_keyword: trends.length > 0 ? `${cfg.keyword} (inspiré de: ${trends.slice(0,3).join(', ')})` : cfg.keyword\n  }\n}];"
+      },
+      "id": "code-parse-trends",
+      "name": "Parse Trends",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-900, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"temperature\": 0.85,\n  \"response_format\": { \"type\": \"json_object\" },\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Tu es un expert en création de contenu viral pour TikTok/Reels/Shorts. Tu réponds STRICTEMENT en JSON valide.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Crée un script de vidéo verticale courte (durée: {{ $json.duration_seconds }}s) en langue '{{ $json.language }}' pour la niche '{{ $json.niche }}' et le mot-clé '{{ $json.enriched_keyword }}'.\\n\\nFormat de réponse JSON OBLIGATOIRE:\\n{\\n  \\\"title\\\": \\\"titre accrocheur < 70 caractères\\\",\\n  \\\"hook\\\": \\\"phrase d'accroche 3 premières secondes\\\",\\n  \\\"scenes\\\": [\\n    { \\\"text\\\": \\\"narration scène 1\\\", \\\"image_prompt\\\": \\\"description visuelle anglaise détaillée pour génération d'image\\\", \\\"duration\\\": 5 }\\n  ],\\n  \\\"cta\\\": \\\"call to action final\\\",\\n  \\\"description\\\": \\\"description SEO 150 mots avec mots-clés\\\",\\n  \\\"hashtags\\\": [\\\"#hashtag1\\\", \\\"#hashtag2\\\"],\\n  \\\"youtube_tags\\\": [\\\"tag1\\\",\\\"tag2\\\"]\\n}\\n\\nRègles:\\n- 5 à 8 scènes maximum\\n- Total des durations = {{ $json.duration_seconds }}\\n- Hook ultra accrocheur dans les 3 premières secondes\\n- Image prompts toujours en anglais, très descriptifs, photorealistic, cinematic\\n- 15 hashtags ciblés\\n- Descriptions optimisées SEO pour la plateforme\"\n    }\n  ]\n}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "groq-script",
+      "name": "Groq - Generate Script (Llama 3.3)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-680, 500],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "groq_api_key",
+          "name": "Groq API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst cfg = $('Parse Trends').first().json;\nconst content = response.choices?.[0]?.message?.content;\nif (!content) throw new Error('No content from Groq');\n\nconst script = JSON.parse(content);\n\n// Validate scenes\nif (!Array.isArray(script.scenes) || script.scenes.length === 0) {\n  throw new Error('Invalid scenes');\n}\n\n// Add scene index + slug filenames\nscript.scenes = script.scenes.map((s, i) => ({\n  ...s,\n  index: i,\n  image_file: `${cfg.work_dir}/${cfg.video_id}/img_${String(i).padStart(2,'0')}.jpg`,\n  audio_file: `${cfg.work_dir}/${cfg.video_id}/audio_${String(i).padStart(2,'0')}.mp3`,\n  clip_file: `${cfg.work_dir}/${cfg.video_id}/clip_${String(i).padStart(2,'0')}.mp4`\n}));\n\nreturn [{\n  json: {\n    ...cfg,\n    script,\n    output_video: `${cfg.work_dir}/${cfg.video_id}/final.mp4`,\n    output_video_with_subs: `${cfg.work_dir}/${cfg.video_id}/final_subs.mp4`,\n    work_subdir: `${cfg.work_dir}/${cfg.video_id}`\n  }\n}];"
+      },
+      "id": "code-parse-script",
+      "name": "Parse & Enrich Script",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-460, 500]
+    },
+    {
+      "parameters": {
+        "command": "=mkdir -p \"{{ $json.work_subdir }}\""
+      },
+      "id": "mkdir",
+      "name": "Create work dir",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [-240, 500]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "script.scenes",
+        "include": "allOtherFields",
+        "options": {}
+      },
+      "id": "split-scenes",
+      "name": "Split Scenes",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [-20, 500]
+    },
+    {
+      "parameters": {
+        "url": "=https://image.pollinations.ai/prompt/{{ encodeURIComponent($json.image_prompt + ', vertical 9:16, photorealistic, cinematic, ultra detailed, 4k') }}?width=1080&height=1920&nologo=true&enhance=true&seed={{ Math.floor(Math.random()*999999) }}",
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "http-image",
+      "name": "Pollinations - Generate Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 500]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.image_file }}",
+        "options": {}
+      },
+      "id": "write-image",
+      "name": "Save Image to disk",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [460, 500]
+    },
+    {
+      "parameters": {
+        "command": "=python3 /data/scripts/edge_tts.py --text {{ JSON.stringify($json.text) }} --voice \"{{ $('Parse & Enrich Script').first().json.voice }}\" --output \"{{ $json.audio_file }}\""
+      },
+      "id": "exec-tts",
+      "name": "Edge TTS - Generate Voice",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [700, 500]
+    },
+    {
+      "parameters": {
+        "command": "=ffmpeg -y -loop 1 -i \"{{ $json.image_file }}\" -i \"{{ $json.audio_file }}\" -vf \"zoompan=z='min(zoom+0.0015,1.15)':d={{ Math.round($json.duration*30) }}:s=1080x1920,format=yuv420p\" -c:v libx264 -preset fast -tune stillimage -c:a aac -b:a 192k -pix_fmt yuv420p -shortest \"{{ $json.clip_file }}\""
+      },
+      "id": "exec-clip",
+      "name": "FFmpeg - Build Scene Clip (zoom)",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [940, 500]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "all_clips",
+        "options": {}
+      },
+      "id": "aggregate-clips",
+      "name": "Aggregate clips",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [1180, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.first().json.all_clips || [];\nconst cfg = $('Parse & Enrich Script').first().json;\nconst fs = require('fs');\nconst listFile = `${cfg.work_subdir}/concat.txt`;\nconst content = items.map(i => `file '${i.clip_file}'`).join('\\n');\nfs.writeFileSync(listFile, content);\nreturn [{ json: { ...cfg, concat_file: listFile, scene_count: items.length } }];"
+      },
+      "id": "code-write-concat",
+      "name": "Write FFmpeg concat list",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1420, 500]
+    },
+    {
+      "parameters": {
+        "command": "=ffmpeg -y -f concat -safe 0 -i \"{{ $json.concat_file }}\" -c copy \"{{ $json.work_subdir }}/concat.mp4\" && ffmpeg -y -i \"{{ $json.work_subdir }}/concat.mp4\" -i /data/assets/music/bg.mp3 -filter_complex \"[1:a]volume=0.12,aloop=loop=-1:size=2e+09[bg];[0:a][bg]amix=inputs=2:duration=first:dropout_transition=2[a]\" -map 0:v -map \"[a]\" -c:v copy -c:a aac -b:a 192k -shortest \"{{ $json.output_video }}\""
+      },
+      "id": "exec-concat",
+      "name": "FFmpeg - Concat + BG music",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1660, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/audio/transcriptions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "whisper-large-v3-turbo"
+            },
+            {
+              "name": "response_format",
+              "value": "srt"
+            },
+            {
+              "name": "file",
+              "parameterType": "formBinaryData",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "groq-whisper",
+      "name": "Groq Whisper - Subtitles SRT",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1900, 500],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "groq_api_key",
+          "name": "Groq API"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst cfg = $('Write FFmpeg concat list').first().json;\nconst srt = $input.first().json?.data || $input.first().json;\nconst srtPath = `${cfg.work_subdir}/subs.srt`;\nfs.writeFileSync(srtPath, typeof srt === 'string' ? srt : '');\nreturn [{ json: { ...cfg, srt_file: srtPath } }];"
+      },
+      "id": "code-write-srt",
+      "name": "Save SRT",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2140, 500]
+    },
+    {
+      "parameters": {
+        "command": "=ffmpeg -y -i \"{{ $json.output_video }}\" -vf \"subtitles='{{ $json.srt_file }}':force_style='FontName=Montserrat,FontSize=14,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=3,Outline=2,Shadow=1,Alignment=2,MarginV=120'\" -c:v libx264 -preset fast -crf 22 -c:a copy \"{{ $json.output_video_with_subs }}\""
+      },
+      "id": "exec-burn-subs",
+      "name": "FFmpeg - Burn Subtitles",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [2380, 500]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "={{ $json.output_video_with_subs }}",
+        "options": {
+          "dataPropertyName": "video"
+        }
+      },
+      "id": "read-final-video",
+      "name": "Read Final Video",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [2620, 500]
+    },
+    {
+      "parameters": {
+        "name": "={{ $('Parse & Enrich Script').first().json.script.title }}.mp4",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "root"
+        },
+        "options": {
+          "binaryPropertyName": "video"
+        }
+      },
+      "id": "drive-upload",
+      "name": "Google Drive - Backup",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [2860, 700],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "google_drive",
+          "name": "Google Drive"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "passThrough"
+      },
+      "id": "merge-publish",
+      "name": "Pass to Publishing",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [2860, 500]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger (every 6h)": {
+      "main": [[{ "node": "Configuration (niche/keyword/lang)", "type": "main", "index": 0 }]]
+    },
+    "Manual Trigger": {
+      "main": [[{ "node": "Configuration (niche/keyword/lang)", "type": "main", "index": 0 }]]
+    },
+    "Configuration (niche/keyword/lang)": {
+      "main": [[{ "node": "Google Trends (free)", "type": "main", "index": 0 }]]
+    },
+    "Google Trends (free)": {
+      "main": [[{ "node": "Parse Trends", "type": "main", "index": 0 }]]
+    },
+    "Parse Trends": {
+      "main": [[{ "node": "Groq - Generate Script (Llama 3.3)", "type": "main", "index": 0 }]]
+    },
+    "Groq - Generate Script (Llama 3.3)": {
+      "main": [[{ "node": "Parse & Enrich Script", "type": "main", "index": 0 }]]
+    },
+    "Parse & Enrich Script": {
+      "main": [[{ "node": "Create work dir", "type": "main", "index": 0 }]]
+    },
+    "Create work dir": {
+      "main": [[{ "node": "Split Scenes", "type": "main", "index": 0 }]]
+    },
+    "Split Scenes": {
+      "main": [[{ "node": "Pollinations - Generate Image", "type": "main", "index": 0 }]]
+    },
+    "Pollinations - Generate Image": {
+      "main": [[{ "node": "Save Image to disk", "type": "main", "index": 0 }]]
+    },
+    "Save Image to disk": {
+      "main": [[{ "node": "Edge TTS - Generate Voice", "type": "main", "index": 0 }]]
+    },
+    "Edge TTS - Generate Voice": {
+      "main": [[{ "node": "FFmpeg - Build Scene Clip (zoom)", "type": "main", "index": 0 }]]
+    },
+    "FFmpeg - Build Scene Clip (zoom)": {
+      "main": [[{ "node": "Aggregate clips", "type": "main", "index": 0 }]]
+    },
+    "Aggregate clips": {
+      "main": [[{ "node": "Write FFmpeg concat list", "type": "main", "index": 0 }]]
+    },
+    "Write FFmpeg concat list": {
+      "main": [[{ "node": "FFmpeg - Concat + BG music", "type": "main", "index": 0 }]]
+    },
+    "FFmpeg - Concat + BG music": {
+      "main": [[{ "node": "Groq Whisper - Subtitles SRT", "type": "main", "index": 0 }]]
+    },
+    "Groq Whisper - Subtitles SRT": {
+      "main": [[{ "node": "Save SRT", "type": "main", "index": 0 }]]
+    },
+    "Save SRT": {
+      "main": [[{ "node": "FFmpeg - Burn Subtitles", "type": "main", "index": 0 }]]
+    },
+    "FFmpeg - Burn Subtitles": {
+      "main": [[{ "node": "Read Final Video", "type": "main", "index": 0 }]]
+    },
+    "Read Final Video": {
+      "main": [[
+        { "node": "Pass to Publishing", "type": "main", "index": 0 },
+        { "node": "Google Drive - Backup", "type": "main", "index": 0 }
+      ]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "timezone": "Europe/Paris",
+    "errorWorkflow": ""
+  },
+  "tags": [
+    { "name": "cliptm" },
+    { "name": "video" },
+    { "name": "ai" }
+  ]
+}
