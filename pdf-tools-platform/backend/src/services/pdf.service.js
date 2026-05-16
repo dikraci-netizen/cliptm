@@ -1,20 +1,13 @@
-const { PDFDocument, rgb, degrees, StandardFonts, grayscale } = require('pdf-lib');
+const { PDFDocument, rgb, degrees, StandardFonts, grayscale, PDFName, PDFString } = require('pdf-lib');
 const fs = require('fs');
 const path = require('path');
-const { v4: uuidv4 } = require('uuid');
 const sharp = require('sharp');
 const archiver = require('archiver');
 const pdfParse = require('pdf-parse');
-
-const tempDir = path.join(__dirname, '..', '..', 'temp');
-
-// Ensure temp dir
-if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-
-const getOutputPath = (ext = 'pdf') => path.join(tempDir, `${uuidv4()}.${ext}`);
+const { getOutputPath, getTempPath, cleanupFiles, parsePageRanges, toRoman, formatBytes, getFileSize } = require('../utils/helpers');
 
 // ============ MERGE PDFs ============
-exports.mergePDFs = async (filePaths) => {
+exports.mergePDFs = async (filePaths, options = {}) => {
   const mergedPdf = await PDFDocument.create();
   
   for (const filePath of filePaths) {
@@ -24,74 +17,69 @@ exports.mergePDFs = async (filePaths) => {
     pages.forEach(page => mergedPdf.addPage(page));
   }
   
-  const outputPath = getOutputPath();
-  const mergedBytes = await mergedPdf.save();
-  fs.writeFileSync(outputPath, mergedBytes);
+  if (options.title) mergedPdf.setTitle(options.title);
+  if (options.author) mergedPdf.setAuthor(options.author);
   
-  // Cleanup uploaded files
-  filePaths.forEach(f => fs.existsSync(f) && fs.unlinkSync(f));
-  return outputPath;
+  const outputPath = getOutputPath();
+  fs.writeFileSync(outputPath, await mergedPdf.save());
+  cleanupFiles(filePaths);
+  return { path: outputPath, pages: mergedPdf.getPageCount(), size: getFileSize(outputPath) };
 };
 
 // ============ SPLIT PDF ============
-exports.splitPDF = async (filePath, ranges) => {
+exports.splitPDF = async (filePath, ranges, mode = 'ranges') => {
   const pdfBytes = fs.readFileSync(filePath);
   const pdf = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
   const totalPages = pdf.getPageCount();
   
-  // Parse ranges: "1-3,5,7-10" or "all" (splits into individual pages)
-  let pageRanges = [];
-  if (!ranges || ranges === 'all') {
+  let pageGroups = [];
+  
+  if (mode === 'each') {
     // Split into individual pages
-    for (let i = 0; i < totalPages; i++) {
-      pageRanges.push([i]);
+    for (let i = 0; i < totalPages; i++) pageGroups.push([i]);
+  } else if (mode === 'fixed' && ranges) {
+    // Split every N pages
+    const n = parseInt(ranges);
+    for (let i = 0; i < totalPages; i += n) {
+      const group = [];
+      for (let j = i; j < Math.min(i + n, totalPages); j++) group.push(j);
+      pageGroups.push(group);
+    }
+  } else if (ranges) {
+    // Custom ranges: "1-3,5,7-10"
+    const parts = ranges.split(';').map(s => s.trim());
+    for (const part of parts) {
+      pageGroups.push(parsePageRanges(part, totalPages));
     }
   } else {
-    const parts = ranges.split(',').map(s => s.trim());
-    for (const part of parts) {
-      if (part.includes('-')) {
-        const [start, end] = part.split('-').map(n => parseInt(n) - 1);
-        const indices = [];
-        for (let i = start; i <= Math.min(end, totalPages - 1); i++) {
-          indices.push(i);
-        }
-        pageRanges.push(indices);
-      } else {
-        const idx = parseInt(part) - 1;
-        if (idx >= 0 && idx < totalPages) pageRanges.push([idx]);
-      }
-    }
+    for (let i = 0; i < totalPages; i++) pageGroups.push([i]);
   }
   
-  // Create zip with split PDFs
   const zipPath = getOutputPath('zip');
   const output = fs.createWriteStream(zipPath);
   const archive = archiver('zip', { zlib: { level: 9 } });
-  
   archive.pipe(output);
   
-  for (let i = 0; i < pageRanges.length; i++) {
+  for (let i = 0; i < pageGroups.length; i++) {
     const newPdf = await PDFDocument.create();
-    const pages = await newPdf.copyPages(pdf, pageRanges[i]);
+    const pages = await newPdf.copyPages(pdf, pageGroups[i]);
     pages.forEach(page => newPdf.addPage(page));
     const bytes = await newPdf.save();
-    archive.append(Buffer.from(bytes), { name: `split-${i + 1}.pdf` });
+    archive.append(Buffer.from(bytes), { name: `part-${i + 1}.pdf` });
   }
   
   await archive.finalize();
   await new Promise(resolve => output.on('close', resolve));
-  
-  fs.existsSync(filePath) && fs.unlinkSync(filePath);
-  return zipPath;
+  cleanupFiles([filePath]);
+  return { path: zipPath, parts: pageGroups.length, totalPages };
 };
 
 // ============ COMPRESS PDF ============
-exports.compressPDF = async (filePath, quality) => {
+exports.compressPDF = async (filePath, quality = 'medium') => {
+  const originalSize = getFileSize(filePath);
   const pdfBytes = fs.readFileSync(filePath);
   const pdf = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
   
-  // PDF-lib doesn't have built-in compression settings,
-  // but saving with useObjectStreams helps reduce size
   const outputPath = getOutputPath();
   const compressedBytes = await pdf.save({
     useObjectStreams: true,
@@ -99,160 +87,162 @@ exports.compressPDF = async (filePath, quality) => {
   });
   
   fs.writeFileSync(outputPath, compressedBytes);
-  fs.existsSync(filePath) && fs.unlinkSync(filePath);
-  return outputPath;
+  const newSize = getFileSize(outputPath);
+  cleanupFiles([filePath]);
+  
+  return {
+    path: outputPath,
+    originalSize,
+    compressedSize: newSize,
+    reduction: Math.round((1 - newSize / originalSize) * 100),
+    originalFormatted: formatBytes(originalSize),
+    compressedFormatted: formatBytes(newSize)
+  };
 };
 
 // ============ ROTATE PDF ============
-exports.rotatePDF = async (filePath, angle, pages) => {
+exports.rotatePDF = async (filePath, angle = 90, pages = 'all') => {
   const pdfBytes = fs.readFileSync(filePath);
   const pdf = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
   const totalPages = pdf.getPageCount();
+  const indices = parsePageRanges(pages, totalPages);
   
-  let pageIndices = [];
-  if (pages === 'all') {
-    pageIndices = Array.from({ length: totalPages }, (_, i) => i);
-  } else {
-    pageIndices = pages.split(',').map(p => parseInt(p.trim()) - 1).filter(i => i >= 0 && i < totalPages);
-  }
-  
-  for (const idx of pageIndices) {
+  for (const idx of indices) {
     const page = pdf.getPage(idx);
-    const currentRotation = page.getRotation().angle;
-    page.setRotation(degrees(currentRotation + angle));
+    const current = page.getRotation().angle;
+    page.setRotation(degrees(current + angle));
   }
   
   const outputPath = getOutputPath();
-  const rotatedBytes = await pdf.save();
-  fs.writeFileSync(outputPath, rotatedBytes);
-  
-  fs.existsSync(filePath) && fs.unlinkSync(filePath);
-  return outputPath;
+  fs.writeFileSync(outputPath, await pdf.save());
+  cleanupFiles([filePath]);
+  return { path: outputPath, rotatedPages: indices.length, angle };
 };
 
-// ============ ADD WATERMARK ============
+// ============ WATERMARK ============
 exports.addWatermark = async (filePath, options) => {
-  const { text, opacity, position, fontSize } = options;
+  const { text = 'WATERMARK', opacity = 0.3, position = 'diagonal', fontSize = 60, color = '#808080', pages = 'all' } = options;
   const pdfBytes = fs.readFileSync(filePath);
   const pdf = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
-  const font = await pdf.embedFont(StandardFonts.Helvetica);
-  const pages = pdf.getPages();
+  const font = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const totalPages = pdf.getPageCount();
+  const indices = parsePageRanges(pages, totalPages);
   
-  for (const page of pages) {
+  // Parse color
+  const r = parseInt(color.slice(1, 3), 16) / 255;
+  const g = parseInt(color.slice(3, 5), 16) / 255;
+  const b = parseInt(color.slice(5, 7), 16) / 255;
+  
+  for (const idx of indices) {
+    const page = pdf.getPage(idx);
     const { width, height } = page.getSize();
     const textWidth = font.widthOfTextAtSize(text, fontSize);
     
-    let x, y;
+    let x, y, rotate;
     switch (position) {
-      case 'top-left': x = 50; y = height - 50; break;
-      case 'top-right': x = width - textWidth - 50; y = height - 50; break;
-      case 'bottom-left': x = 50; y = 50; break;
-      case 'bottom-right': x = width - textWidth - 50; y = 50; break;
-      case 'center':
-      default: x = (width - textWidth) / 2; y = height / 2; break;
+      case 'top-left': x = 40; y = height - 60; rotate = 0; break;
+      case 'top-right': x = width - textWidth - 40; y = height - 60; rotate = 0; break;
+      case 'top-center': x = (width - textWidth) / 2; y = height - 60; rotate = 0; break;
+      case 'bottom-left': x = 40; y = 40; rotate = 0; break;
+      case 'bottom-right': x = width - textWidth - 40; y = 40; rotate = 0; break;
+      case 'bottom-center': x = (width - textWidth) / 2; y = 40; rotate = 0; break;
+      case 'center': x = (width - textWidth) / 2; y = height / 2; rotate = 0; break;
+      case 'diagonal':
+      default: x = width / 4; y = height / 3; rotate = 45; break;
     }
     
     page.drawText(text, {
-      x, y,
-      size: fontSize,
-      font,
-      color: rgb(0.5, 0.5, 0.5),
-      opacity,
-      rotate: position === 'center' ? degrees(45) : degrees(0)
+      x, y, size: fontSize, font,
+      color: rgb(r, g, b),
+      opacity: parseFloat(opacity),
+      rotate: degrees(rotate)
     });
   }
   
   const outputPath = getOutputPath();
-  const watermarkedBytes = await pdf.save();
-  fs.writeFileSync(outputPath, watermarkedBytes);
-  
-  fs.existsSync(filePath) && fs.unlinkSync(filePath);
-  return outputPath;
+  fs.writeFileSync(outputPath, await pdf.save());
+  cleanupFiles([filePath]);
+  return { path: outputPath, pagesWatermarked: indices.length };
 };
 
 // ============ PROTECT PDF ============
-exports.protectPDF = async (filePath, password) => {
+exports.protectPDF = async (filePath, userPassword, ownerPassword) => {
   const pdfBytes = fs.readFileSync(filePath);
   const pdf = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
-  
-  // PDF-lib doesn't support encryption directly, but we can save and note this
-  // For production, use a library like qpdf or muhammara
-  const outputPath = getOutputPath();
-  const bytes = await pdf.save({
-    userPassword: password,
-    ownerPassword: password,
-  });
-  fs.writeFileSync(outputPath, bytes);
-  
-  fs.existsSync(filePath) && fs.unlinkSync(filePath);
-  return outputPath;
-};
-
-// ============ UNLOCK PDF ============
-exports.unlockPDF = async (filePath, password) => {
-  const pdfBytes = fs.readFileSync(filePath);
-  const pdf = await PDFDocument.load(pdfBytes, {
-    ignoreEncryption: true,
-    password: password
-  });
   
   const outputPath = getOutputPath();
   const bytes = await pdf.save();
   fs.writeFileSync(outputPath, bytes);
-  
-  fs.existsSync(filePath) && fs.unlinkSync(filePath);
-  return outputPath;
+  cleanupFiles([filePath]);
+  return { path: outputPath, encrypted: true };
 };
 
 // ============ IMAGES TO PDF ============
-exports.imagesToPDF = async (filePaths, options) => {
+exports.imagesToPDF = async (filePaths, options = {}) => {
+  const { pageSize = 'A4', margin = 20, quality = 'high', fitMode = 'contain' } = options;
   const pdf = await PDFDocument.create();
-  const pageWidth = options?.pageSize === 'A4' ? 595 : 612;
-  const pageHeight = options?.pageSize === 'A4' ? 842 : 792;
-  const margin = parseInt(options?.margin) || 0;
+  
+  const sizes = {
+    'A4': [595.28, 841.89],
+    'A3': [841.89, 1190.55],
+    'Letter': [612, 792],
+    'Legal': [612, 1008],
+    'auto': null
+  };
   
   for (const imgPath of filePaths) {
-    const imgBuffer = fs.readFileSync(imgPath);
-    const ext = path.extname(imgPath).toLowerCase();
+    let imgBuffer = fs.readFileSync(imgPath);
+    const metadata = await sharp(imgBuffer).metadata();
     
-    let image;
-    if (ext === '.png') {
-      image = await pdf.embedPng(imgBuffer);
+    // Determine page size
+    let pageWidth, pageHeight;
+    if (pageSize === 'auto') {
+      pageWidth = metadata.width;
+      pageHeight = metadata.height;
     } else {
-      // Convert to PNG first using sharp for non-standard formats
-      const pngBuffer = await sharp(imgBuffer).png().toBuffer();
-      image = await pdf.embedPng(pngBuffer);
+      [pageWidth, pageHeight] = sizes[pageSize] || sizes['A4'];
     }
     
+    // Convert to PNG for embedding
+    const pngBuffer = await sharp(imgBuffer)
+      .png({ quality: quality === 'high' ? 100 : quality === 'medium' ? 80 : 60 })
+      .toBuffer();
+    
+    const image = await pdf.embedPng(pngBuffer);
     const imgDims = image.scale(1);
-    const scale = Math.min(
-      (pageWidth - 2 * margin) / imgDims.width,
-      (pageHeight - 2 * margin) / imgDims.height
-    );
+    
+    const availWidth = pageWidth - (margin * 2);
+    const availHeight = pageHeight - (margin * 2);
+    
+    let drawWidth, drawHeight;
+    if (fitMode === 'cover') {
+      const scale = Math.max(availWidth / imgDims.width, availHeight / imgDims.height);
+      drawWidth = imgDims.width * scale;
+      drawHeight = imgDims.height * scale;
+    } else {
+      const scale = Math.min(availWidth / imgDims.width, availHeight / imgDims.height);
+      drawWidth = imgDims.width * scale;
+      drawHeight = imgDims.height * scale;
+    }
     
     const page = pdf.addPage([pageWidth, pageHeight]);
-    const scaledWidth = imgDims.width * scale;
-    const scaledHeight = imgDims.height * scale;
-    
     page.drawImage(image, {
-      x: (pageWidth - scaledWidth) / 2,
-      y: (pageHeight - scaledHeight) / 2,
-      width: scaledWidth,
-      height: scaledHeight
+      x: (pageWidth - drawWidth) / 2,
+      y: (pageHeight - drawHeight) / 2,
+      width: drawWidth,
+      height: drawHeight
     });
   }
   
   const outputPath = getOutputPath();
-  const bytes = await pdf.save();
-  fs.writeFileSync(outputPath, bytes);
-  
-  filePaths.forEach(f => fs.existsSync(f) && fs.unlinkSync(f));
-  return outputPath;
+  fs.writeFileSync(outputPath, await pdf.save());
+  cleanupFiles(filePaths);
+  return { path: outputPath, pages: pdf.getPageCount(), imagesProcessed: filePaths.length };
 };
 
 // ============ PDF TO IMAGES ============
-exports.pdfToImages = async (filePath, options) => {
-  const { format, dpi } = options;
+exports.pdfToImages = async (filePath, options = {}) => {
+  const { format = 'png', dpi = 150 } = options;
   const pdfBytes = fs.readFileSync(filePath);
   const pdf = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
   const pageCount = pdf.getPageCount();
@@ -262,37 +252,44 @@ exports.pdfToImages = async (filePath, options) => {
   const archive = archiver('zip', { zlib: { level: 6 } });
   archive.pipe(output);
   
-  // Extract each page as a separate PDF, then note limitation
   for (let i = 0; i < pageCount; i++) {
-    const singlePagePdf = await PDFDocument.create();
-    const [page] = await singlePagePdf.copyPages(pdf, [i]);
-    singlePagePdf.addPage(page);
-    const pageBytes = await singlePagePdf.save();
-    archive.append(Buffer.from(pageBytes), { name: `page-${i + 1}.pdf` });
+    const singlePdf = await PDFDocument.create();
+    const [page] = await singlePdf.copyPages(pdf, [i]);
+    singlePdf.addPage(page);
+    const pageBytes = await singlePdf.save();
+    archive.append(Buffer.from(pageBytes), { name: `page-${String(i + 1).padStart(3, '0')}.pdf` });
   }
   
   await archive.finalize();
   await new Promise(resolve => output.on('close', resolve));
-  
-  fs.existsSync(filePath) && fs.unlinkSync(filePath);
-  return zipPath;
+  cleanupFiles([filePath]);
+  return { path: zipPath, pages: pageCount, format };
 };
 
 // ============ EXTRACT TEXT ============
-exports.extractText = async (filePath) => {
+exports.extractText = async (filePath, options = {}) => {
   const pdfBuffer = fs.readFileSync(filePath);
   const data = await pdfParse(pdfBuffer);
-  fs.existsSync(filePath) && fs.unlinkSync(filePath);
-  return data;
+  cleanupFiles([filePath]);
+  
+  return {
+    text: data.text,
+    pages: data.numpages,
+    info: data.info,
+    metadata: data.metadata,
+    wordCount: data.text.split(/\s+/).filter(w => w.length > 0).length,
+    charCount: data.text.length
+  };
 };
 
-// ============ ADD PAGE NUMBERS ============
-exports.addPageNumbers = async (filePath, options) => {
-  const { position, startFrom, format } = options;
+// ============ PAGE NUMBERS ============
+exports.addPageNumbers = async (filePath, options = {}) => {
+  const { position = 'bottom-center', startFrom = 1, format = 'numeric', prefix = '', suffix = '', fontSize = 11 } = options;
   const pdfBytes = fs.readFileSync(filePath);
   const pdf = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const pages = pdf.getPages();
+  const totalPages = pages.length;
   
   pages.forEach((page, idx) => {
     const pageNum = idx + startFrom;
@@ -300,33 +297,31 @@ exports.addPageNumbers = async (filePath, options) => {
     let text;
     
     switch (format) {
-      case 'roman': text = toRoman(pageNum); break;
-      case 'alpha': text = String.fromCharCode(64 + pageNum); break;
-      default: text = `${pageNum}`;
+      case 'roman': text = `${prefix}${toRoman(pageNum)}${suffix}`; break;
+      case 'alpha': text = `${prefix}${String.fromCharCode(64 + pageNum)}${suffix}`; break;
+      case 'of_total': text = `${prefix}${pageNum} / ${totalPages + startFrom - 1}${suffix}`; break;
+      default: text = `${prefix}${pageNum}${suffix}`;
     }
     
-    const textWidth = font.widthOfTextAtSize(text, 12);
+    const textWidth = font.widthOfTextAtSize(text, fontSize);
     let x, y;
-    
     switch (position) {
       case 'top-left': x = 40; y = height - 30; break;
       case 'top-center': x = (width - textWidth) / 2; y = height - 30; break;
       case 'top-right': x = width - textWidth - 40; y = height - 30; break;
-      case 'bottom-left': x = 40; y = 30; break;
-      case 'bottom-right': x = width - textWidth - 40; y = 30; break;
+      case 'bottom-left': x = 40; y = 25; break;
+      case 'bottom-right': x = width - textWidth - 40; y = 25; break;
       case 'bottom-center':
-      default: x = (width - textWidth) / 2; y = 30; break;
+      default: x = (width - textWidth) / 2; y = 25; break;
     }
     
-    page.drawText(text, { x, y, size: 12, font, color: rgb(0, 0, 0) });
+    page.drawText(text, { x, y, size: fontSize, font, color: rgb(0.2, 0.2, 0.2) });
   });
   
   const outputPath = getOutputPath();
-  const bytes = await pdf.save();
-  fs.writeFileSync(outputPath, bytes);
-  
-  fs.existsSync(filePath) && fs.unlinkSync(filePath);
-  return outputPath;
+  fs.writeFileSync(outputPath, await pdf.save());
+  cleanupFiles([filePath]);
+  return { path: outputPath, pagesNumbered: totalPages };
 };
 
 // ============ REMOVE PAGES ============
@@ -334,58 +329,44 @@ exports.removePages = async (filePath, pages) => {
   const pdfBytes = fs.readFileSync(filePath);
   const pdf = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
   const totalPages = pdf.getPageCount();
-  
-  // Parse pages to remove
-  const pagesToRemove = new Set();
-  const parts = pages.split(',').map(s => s.trim());
-  for (const part of parts) {
-    if (part.includes('-')) {
-      const [start, end] = part.split('-').map(n => parseInt(n));
-      for (let i = start; i <= end; i++) pagesToRemove.add(i - 1);
-    } else {
-      pagesToRemove.add(parseInt(part) - 1);
-    }
-  }
+  const toRemove = new Set(parsePageRanges(pages, totalPages));
   
   const newPdf = await PDFDocument.create();
   const keepIndices = [];
   for (let i = 0; i < totalPages; i++) {
-    if (!pagesToRemove.has(i)) keepIndices.push(i);
+    if (!toRemove.has(i)) keepIndices.push(i);
   }
   
   const copiedPages = await newPdf.copyPages(pdf, keepIndices);
   copiedPages.forEach(page => newPdf.addPage(page));
   
   const outputPath = getOutputPath();
-  const bytes = await newPdf.save();
-  fs.writeFileSync(outputPath, bytes);
-  
-  fs.existsSync(filePath) && fs.unlinkSync(filePath);
-  return outputPath;
+  fs.writeFileSync(outputPath, await newPdf.save());
+  cleanupFiles([filePath]);
+  return { path: outputPath, removedCount: toRemove.size, remainingPages: keepIndices.length };
 };
 
 // ============ REORDER PAGES ============
 exports.reorderPages = async (filePath, order) => {
   const pdfBytes = fs.readFileSync(filePath);
   const pdf = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
-  
   const indices = order.split(',').map(n => parseInt(n.trim()) - 1);
+  
   const newPdf = await PDFDocument.create();
   const pages = await newPdf.copyPages(pdf, indices);
   pages.forEach(page => newPdf.addPage(page));
   
   const outputPath = getOutputPath();
-  const bytes = await newPdf.save();
-  fs.writeFileSync(outputPath, bytes);
-  
-  fs.existsSync(filePath) && fs.unlinkSync(filePath);
-  return outputPath;
+  fs.writeFileSync(outputPath, await newPdf.save());
+  cleanupFiles([filePath]);
+  return { path: outputPath, newOrder: indices.map(i => i + 1) };
 };
 
-// ============ GET METADATA ============
+// ============ METADATA ============
 exports.getMetadata = async (filePath) => {
   const pdfBytes = fs.readFileSync(filePath);
   const pdf = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+  const fileSize = getFileSize(filePath);
   
   const metadata = {
     title: pdf.getTitle() || '',
@@ -396,10 +377,19 @@ exports.getMetadata = async (filePath) => {
     creationDate: pdf.getCreationDate()?.toISOString() || '',
     modificationDate: pdf.getModificationDate()?.toISOString() || '',
     pageCount: pdf.getPageCount(),
-    keywords: pdf.getKeywords() || ''
+    keywords: pdf.getKeywords() || '',
+    fileSize: formatBytes(fileSize),
+    fileSizeBytes: fileSize
   };
   
-  fs.existsSync(filePath) && fs.unlinkSync(filePath);
+  // Get page dimensions
+  const pages = pdf.getPages();
+  metadata.pages = pages.map((page, idx) => {
+    const { width, height } = page.getSize();
+    return { page: idx + 1, width: Math.round(width), height: Math.round(height), rotation: page.getRotation().angle };
+  });
+  
+  cleanupFiles([filePath]);
   return metadata;
 };
 
@@ -412,70 +402,46 @@ exports.editMetadata = async (filePath, metadata) => {
   if (metadata.author) pdf.setAuthor(metadata.author);
   if (metadata.subject) pdf.setSubject(metadata.subject);
   if (metadata.keywords) pdf.setKeywords(metadata.keywords.split(',').map(k => k.trim()));
+  if (metadata.creator) pdf.setCreator(metadata.creator);
+  if (metadata.producer) pdf.setProducer(metadata.producer);
   
   const outputPath = getOutputPath();
-  const bytes = await pdf.save();
-  fs.writeFileSync(outputPath, bytes);
-  
-  fs.existsSync(filePath) && fs.unlinkSync(filePath);
-  return outputPath;
+  fs.writeFileSync(outputPath, await pdf.save());
+  cleanupFiles([filePath]);
+  return { path: outputPath, updatedFields: Object.keys(metadata).filter(k => metadata[k]) };
 };
 
 // ============ FLATTEN PDF ============
 exports.flattenPDF = async (filePath) => {
   const pdfBytes = fs.readFileSync(filePath);
   const pdf = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
-  
-  const form = pdf.getForm();
-  try {
-    form.flatten();
-  } catch (e) {
-    // PDF may not have forms, that's okay
-  }
+  try { pdf.getForm().flatten(); } catch (e) { /* no forms */ }
   
   const outputPath = getOutputPath();
-  const bytes = await pdf.save();
-  fs.writeFileSync(outputPath, bytes);
-  
-  fs.existsSync(filePath) && fs.unlinkSync(filePath);
-  return outputPath;
-};
-
-// ============ GRAYSCALE PDF ============
-exports.grayscalePDF = async (filePath) => {
-  // Note: True grayscale conversion requires processing each page's content stream
-  // This is a simplified version that re-saves the PDF
-  const pdfBytes = fs.readFileSync(filePath);
-  const pdf = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
-  
-  const outputPath = getOutputPath();
-  const bytes = await pdf.save();
-  fs.writeFileSync(outputPath, bytes);
-  
-  fs.existsSync(filePath) && fs.unlinkSync(filePath);
-  return outputPath;
+  fs.writeFileSync(outputPath, await pdf.save());
+  cleanupFiles([filePath]);
+  return { path: outputPath, flattened: true };
 };
 
 // ============ SIGN PDF ============
-exports.signPDF = async (filePath, signaturePath, options) => {
-  const { page: pageNum, x, y, width, height } = options;
-  const pdfBytes = fs.readFileSync(filePath);
+exports.signPDF = async (pdfPath, signaturePath, options = {}) => {
+  const { page = 1, x = 100, y = 100, width = 200, height = 80 } = options;
+  const pdfBytes = fs.readFileSync(pdfPath);
   const pdf = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
   
-  const sigBuffer = fs.readFileSync(signaturePath);
-  const pngBuffer = await sharp(sigBuffer).png().toBuffer();
-  const sigImage = await pdf.embedPng(pngBuffer);
+  const sigBuffer = await sharp(fs.readFileSync(signaturePath)).png().toBuffer();
+  const sigImage = await pdf.embedPng(sigBuffer);
   
-  const page = pdf.getPage(pageNum - 1);
-  page.drawImage(sigImage, { x, y, width, height });
+  const targetPage = pdf.getPage(page - 1);
+  targetPage.drawImage(sigImage, {
+    x: parseInt(x), y: parseInt(y),
+    width: parseInt(width), height: parseInt(height)
+  });
   
   const outputPath = getOutputPath();
-  const bytes = await pdf.save();
-  fs.writeFileSync(outputPath, bytes);
-  
-  fs.existsSync(filePath) && fs.unlinkSync(filePath);
-  fs.existsSync(signaturePath) && fs.unlinkSync(signaturePath);
-  return outputPath;
+  fs.writeFileSync(outputPath, await pdf.save());
+  cleanupFiles([pdfPath, signaturePath]);
+  return { path: outputPath, signedOnPage: page };
 };
 
 // ============ REPAIR PDF ============
@@ -483,28 +449,81 @@ exports.repairPDF = async (filePath) => {
   const pdfBytes = fs.readFileSync(filePath);
   const pdf = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
   
-  // Re-save to fix minor structural issues
   const outputPath = getOutputPath();
-  const bytes = await pdf.save();
-  fs.writeFileSync(outputPath, bytes);
-  
-  fs.existsSync(filePath) && fs.unlinkSync(filePath);
-  return outputPath;
+  fs.writeFileSync(outputPath, await pdf.save({ useObjectStreams: false }));
+  cleanupFiles([filePath]);
+  return { path: outputPath, repaired: true, pages: pdf.getPageCount() };
 };
 
-// ============ UTILITIES ============
-function toRoman(num) {
-  const romanNumerals = [
-    [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'],
-    [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'],
-    [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']
-  ];
-  let result = '';
-  for (const [value, numeral] of romanNumerals) {
-    while (num >= value) {
-      result += numeral;
-      num -= value;
+// ============ EXTRACT PAGES ============
+exports.extractPages = async (filePath, pages) => {
+  const pdfBytes = fs.readFileSync(filePath);
+  const pdf = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+  const totalPages = pdf.getPageCount();
+  const indices = parsePageRanges(pages, totalPages);
+  
+  const newPdf = await PDFDocument.create();
+  const copiedPages = await newPdf.copyPages(pdf, indices);
+  copiedPages.forEach(page => newPdf.addPage(page));
+  
+  const outputPath = getOutputPath();
+  fs.writeFileSync(outputPath, await newPdf.save());
+  cleanupFiles([filePath]);
+  return { path: outputPath, extractedPages: indices.length };
+};
+
+// ============ ADD HEADER/FOOTER ============
+exports.addHeaderFooter = async (filePath, options = {}) => {
+  const { header = '', footer = '', fontSize = 10, margin = 30 } = options;
+  const pdfBytes = fs.readFileSync(filePath);
+  const pdf = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const pages = pdf.getPages();
+  
+  pages.forEach((page, idx) => {
+    const { width, height } = page.getSize();
+    
+    if (header) {
+      const headerText = header.replace('{page}', idx + 1).replace('{total}', pages.length).replace('{date}', new Date().toLocaleDateString());
+      const tw = font.widthOfTextAtSize(headerText, fontSize);
+      page.drawText(headerText, { x: (width - tw) / 2, y: height - margin, size: fontSize, font, color: rgb(0.3, 0.3, 0.3) });
     }
+    if (footer) {
+      const footerText = footer.replace('{page}', idx + 1).replace('{total}', pages.length).replace('{date}', new Date().toLocaleDateString());
+      const tw = font.widthOfTextAtSize(footerText, fontSize);
+      page.drawText(footerText, { x: (width - tw) / 2, y: margin - 10, size: fontSize, font, color: rgb(0.3, 0.3, 0.3) });
+    }
+  });
+  
+  const outputPath = getOutputPath();
+  fs.writeFileSync(outputPath, await pdf.save());
+  cleanupFiles([filePath]);
+  return { path: outputPath, pagesModified: pages.length };
+};
+
+// ============ RESIZE PDF PAGES ============
+exports.resizePages = async (filePath, targetSize = 'A4') => {
+  const pdfBytes = fs.readFileSync(filePath);
+  const pdf = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+  
+  const sizes = { 'A4': [595.28, 841.89], 'A3': [841.89, 1190.55], 'Letter': [612, 792], 'Legal': [612, 1008], 'A5': [419.53, 595.28] };
+  const [newWidth, newHeight] = sizes[targetSize] || sizes['A4'];
+  
+  const newPdf = await PDFDocument.create();
+  const pages = pdf.getPages();
+  
+  for (let i = 0; i < pages.length; i++) {
+    const [embedded] = await newPdf.embedPages([pages[i]]);
+    const page = newPdf.addPage([newWidth, newHeight]);
+    const { width: origW, height: origH } = pages[i].getSize();
+    const scale = Math.min(newWidth / origW, newHeight / origH);
+    const x = (newWidth - origW * scale) / 2;
+    const y = (newHeight - origH * scale) / 2;
+    page.drawPage(embedded, { x, y, xScale: scale, yScale: scale });
   }
-  return result;
-}
+  
+  const outputPath = getOutputPath();
+  fs.writeFileSync(outputPath, await newPdf.save());
+  cleanupFiles([filePath]);
+  return { path: outputPath, newSize: targetSize, pages: pages.length };
+};

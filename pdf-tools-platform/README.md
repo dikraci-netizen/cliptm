@@ -1,125 +1,143 @@
-# 📄 PDF Tools Pro
+# PDF Tools Pro v2.0 - La plateforme PDF la plus avancée
 
-> Plateforme complète de gestion et manipulation de PDF - Tous vos outils PDF en un seul endroit.
+> Plus puissante que iLovePDF, SmallPDF et PDF24 combinés. 30+ outils professionnels avec IA, OCR, batch processing et temps réel.
 
-## 🚀 Fonctionnalités
+## Ce qui nous rend unique
+
+| Fonctionnalité | iLovePDF | SmallPDF | PDF24 | **PDF Tools Pro** |
+|---|---|---|---|---|
+| Outils de base | ✅ | ✅ | ✅ | ✅ |
+| OCR intégré | ❌ | Premium | ✅ | **✅ Gratuit** |
+| IA (Résumé/Analyse) | ❌ | ❌ | ❌ | **✅** |
+| Comparaison PDF | ❌ | ❌ | ❌ | **✅** |
+| Batch processing | Limité | Limité | ✅ | **✅ 50 fichiers** |
+| WebSocket temps réel | ❌ | ❌ | ❌ | **✅** |
+| Mode sombre | ❌ | ❌ | ❌ | **✅** |
+| Multi-langue (FR/EN/AR) | Partiel | Partiel | Partiel | **✅ + RTL** |
+| Command Palette | ❌ | ❌ | ❌ | **✅ Ctrl+K** |
+| Annotations/Formes | Premium | Premium | ✅ | **✅ Gratuit** |
+| Création formulaires | Premium | ❌ | ✅ | **✅ Gratuit** |
+| Dashboard temps réel | ❌ | ❌ | ❌ | **✅** |
+| Open Source | ❌ | ❌ | ❌ | **✅** |
+
+## 30+ Outils disponibles
 
 ### Organiser
-- **Fusionner PDF** — Combiner plusieurs PDFs en un seul
-- **Diviser PDF** — Séparer un PDF en plusieurs fichiers
-- **Compresser PDF** — Réduire la taille des fichiers
-- **Supprimer Pages** — Retirer des pages spécifiques
-- **Réordonner Pages** — Changer l'ordre des pages
-- **Réparer PDF** — Réparer un PDF corrompu
+- Fusionner PDF • Diviser PDF • Compresser • Supprimer pages
+- Réordonner pages • Extraire pages • Réparer • Redimensionner
 
 ### Convertir
-- **Images → PDF** — Convertir des images en PDF
-- **PDF → Images** — Extraire les pages en images
-- **Extraire Texte** — Récupérer le texte du PDF
-- **Noir & Blanc** — Convertir en niveaux de gris
-
-### Sécurité
-- **Protéger PDF** — Chiffrer avec mot de passe
-- **Déverrouiller PDF** — Retirer la protection
-- **Signer PDF** — Ajouter une signature image
+- Images → PDF • PDF → Images • Extraire texte
 
 ### Éditer
-- **Pivoter PDF** — Faire pivoter les pages
-- **Filigrane** — Ajouter un filigrane texte
-- **Numéroter Pages** — Ajouter des numéros
-- **Éditer Métadonnées** — Modifier les infos du document
-- **Voir Métadonnées** — Consulter les informations
-- **Aplatir PDF** — Aplatir formulaires et annotations
+- Pivoter • Filigrane • Numéroter pages • En-tête/Pied
+- Métadonnées • Éditer métadonnées • Aplatir
 
-## 📦 Installation
+### Sécurité
+- Protéger (chiffrement) • Signer PDF • Rédaction (masquage)
 
-### Avec Docker (Recommandé)
+### IA & Analyse
+- OCR (reconnaissance de texte) • Résumé IA • Statistiques PDF • Comparer PDFs
 
+### Avancé
+- Annotations (texte, formes, surlignage) • Créer formulaire • Créer PDF from scratch
+
+## Installation
+
+### Docker (Recommandé)
 ```bash
 docker-compose up -d
+# → http://localhost:3000
 ```
 
-L'application sera accessible sur `http://localhost:3000`
-
-### Installation manuelle
-
+### Manuel
 ```bash
-# Backend
 cd backend
 npm install
 npm start
-
-# L'application frontend est servie automatiquement par le backend
+# → http://localhost:3000
 ```
 
-## 🛠️ Technologies
-
-- **Backend** : Node.js, Express.js
-- **PDF Engine** : pdf-lib, pdf-parse
-- **Images** : Sharp
-- **Frontend** : HTML5, CSS3, JavaScript (Vanilla)
-- **Icons** : Font Awesome
-- **Conteneurisation** : Docker
-
-## 📁 Structure du projet
+## Architecture technique
 
 ```
-pdf-tools-platform/
 ├── backend/
 │   ├── src/
-│   │   ├── server.js              # Point d'entrée
-│   │   ├── routes/pdf.routes.js   # Routes API
-│   │   ├── controllers/           # Contrôleurs
-│   │   ├── services/pdf.service.js # Logique métier
-│   │   └── middleware/upload.js   # Gestion des uploads
-│   ├── uploads/                   # Fichiers uploadés (temporaire)
-│   ├── temp/                      # Fichiers traités (temporaire)
+│   │   ├── server.js              # Express + WebSocket server
+│   │   ├── controllers/           # Request handlers
+│   │   ├── services/
+│   │   │   ├── pdf.service.js     # Core PDF operations
+│   │   │   └── advanced.service.js # AI, OCR, Compare, Forms
+│   │   ├── routes/                # API endpoints
+│   │   ├── middleware/upload.js   # Multer (200MB, 50 files)
+│   │   ├── queues/job-queue.js    # Job queue with priority
+│   │   ├── websocket/ws-handler.js # Real-time progress
+│   │   └── utils/helpers.js       # Utilities
+│   ├── uploads/ temp/ output/     # Temporary storage
 │   └── package.json
 ├── frontend/
 │   └── public/
-│       ├── index.html
-│       ├── css/style.css
+│       ├── index.html             # SPA entry point
+│       ├── css/style.css          # Premium glassmorphism CSS
 │       └── js/
-│           ├── app.js
-│           └── tools-config.js
+│           ├── app.js             # Main application logic
+│           ├── tools-config.js    # 30+ tools definitions
+│           ├── i18n.js            # FR/EN/AR translations
+│           └── websocket.js       # Real-time client
 ├── Dockerfile
 ├── docker-compose.yml
 └── README.md
 ```
 
-## 🔒 Sécurité
+## Features premium
 
-- Tous les fichiers sont supprimés automatiquement après 1 heure
-- Rate limiting : 100 requêtes / 15 minutes par IP
-- Taille max par fichier : 100 MB
-- Validation des types MIME
-- Noms de fichiers aléatoires (UUID)
+- **WebSocket** : Suivi en temps réel du traitement
+- **Job Queue** : File d'attente avec priorité, retry automatique
+- **Batch** : Traitement de 50 fichiers simultanément
+- **Command Palette** : Ctrl+K pour recherche rapide
+- **Dark Mode** : Interface sombre/claire avec persistance
+- **i18n** : Français, English, العربية (avec RTL)
+- **Auto-cleanup** : Fichiers supprimés après 1h
+- **Rate limiting** : 200 requêtes/15min par IP
+- **Responsive** : Mobile, tablette, desktop
 
-## 📝 API Endpoints
+## API Reference
 
-| Méthode | Endpoint | Description |
-|---------|----------|-------------|
-| POST | `/api/pdf/merge` | Fusionner PDFs |
-| POST | `/api/pdf/split` | Diviser PDF |
-| POST | `/api/pdf/compress` | Compresser PDF |
-| POST | `/api/pdf/rotate` | Pivoter pages |
-| POST | `/api/pdf/watermark` | Ajouter filigrane |
-| POST | `/api/pdf/protect` | Protéger par mot de passe |
-| POST | `/api/pdf/unlock` | Déverrouiller |
-| POST | `/api/pdf/images-to-pdf` | Images vers PDF |
-| POST | `/api/pdf/pdf-to-images` | PDF vers images |
-| POST | `/api/pdf/extract-text` | Extraire texte |
-| POST | `/api/pdf/page-numbers` | Numéroter pages |
-| POST | `/api/pdf/remove-pages` | Supprimer pages |
-| POST | `/api/pdf/reorder` | Réordonner pages |
-| POST | `/api/pdf/metadata` | Voir métadonnées |
-| POST | `/api/pdf/edit-metadata` | Éditer métadonnées |
-| POST | `/api/pdf/flatten` | Aplatir PDF |
-| POST | `/api/pdf/grayscale` | Noir & blanc |
-| POST | `/api/pdf/sign` | Signer PDF |
-| POST | `/api/pdf/repair` | Réparer PDF |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/pdf/merge` | Merge multiple PDFs |
+| POST | `/api/pdf/split` | Split PDF (ranges/fixed/each) |
+| POST | `/api/pdf/compress` | Compress PDF |
+| POST | `/api/pdf/rotate` | Rotate pages |
+| POST | `/api/pdf/watermark` | Add text watermark |
+| POST | `/api/pdf/protect` | Password protect |
+| POST | `/api/pdf/page-numbers` | Add page numbers |
+| POST | `/api/pdf/remove-pages` | Remove specific pages |
+| POST | `/api/pdf/reorder` | Reorder pages |
+| POST | `/api/pdf/extract-pages` | Extract pages |
+| POST | `/api/pdf/extract-text` | Extract text content |
+| POST | `/api/pdf/metadata` | Get metadata |
+| POST | `/api/pdf/edit-metadata` | Edit metadata |
+| POST | `/api/pdf/flatten` | Flatten forms |
+| POST | `/api/pdf/repair` | Repair corrupted PDF |
+| POST | `/api/pdf/sign` | Add signature image |
+| POST | `/api/pdf/header-footer` | Add header/footer |
+| POST | `/api/pdf/resize` | Resize pages |
+| POST | `/api/convert/images-to-pdf` | Images to PDF |
+| POST | `/api/convert/pdf-to-images` | PDF to images |
+| POST | `/api/advanced/ocr` | OCR text recognition |
+| POST | `/api/advanced/summarize` | AI summarization |
+| POST | `/api/advanced/analyze` | PDF statistics |
+| POST | `/api/advanced/compare` | Compare 2 PDFs |
+| POST | `/api/advanced/redact` | Redaction |
+| POST | `/api/advanced/annotate` | Add annotations |
+| POST | `/api/advanced/create-form` | Create form fields |
+| POST | `/api/advanced/create` | Create PDF from JSON |
+| POST | `/api/batch/process` | Batch process files |
+| GET | `/api/jobs/status` | Queue status |
 | GET | `/api/health` | Health check |
+| WS | `/ws` | WebSocket real-time |
 
-## 📄 Licence
+## Licence
 
 MIT

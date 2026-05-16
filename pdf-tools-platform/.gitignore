@@ -3,6 +3,8 @@ backend/uploads/*
 !backend/uploads/.gitkeep
 backend/temp/*
 !backend/temp/.gitkeep
+backend/output/*
+!backend/output/.gitkeep
 .env
 *.log
 .DS_Store

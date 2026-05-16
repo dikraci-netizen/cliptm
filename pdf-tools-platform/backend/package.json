@@ -1,24 +1,40 @@
 {
-  "name": "pdf-tools-platform-backend",
-  "version": "1.0.0",
-  "description": "Backend API for PDF Tools Platform - All-in-one PDF management",
+  "name": "pdf-tools-pro-backend",
+  "version": "2.0.0",
+  "description": "Advanced PDF Tools Platform - Beyond iLovePDF, SmallPDF & PDF24",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "worker": "node src/workers/pdf-worker.js"
   },
   "dependencies": {
     "express": "^4.18.2",
     "multer": "^1.4.5-lts.1",
     "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "express-rate-limit": "^7.1.5",
+    "ws": "^8.16.0",
+    "bull": "^4.12.2",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^1.1.1",
     "sharp": "^0.33.2",
     "archiver": "^6.0.1",
     "uuid": "^9.0.0",
-    "helmet": "^7.1.0",
-    "morgan": "^1.10.0",
-    "express-rate-limit": "^7.1.5"
+    "tesseract.js": "^5.0.4",
+    "mammoth": "^1.6.0",
+    "html-pdf-node": "^1.0.8",
+    "diff": "^5.2.0",
+    "pdfkit": "^0.14.0",
+    "canvas": "^2.11.2",
+    "dayjs": "^1.11.10",
+    "compression": "^1.7.4",
+    "dotenv": "^16.3.1",
+    "ioredis": "^5.3.2",
+    "nanoid": "^3.3.7",
+    "mime-types": "^2.1.35",
+    "sanitize-filename": "^1.6.3"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

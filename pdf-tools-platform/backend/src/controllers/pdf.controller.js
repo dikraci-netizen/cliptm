@@ -1,112 +1,93 @@
 const pdfService = require('../services/pdf.service');
-const path = require('path');
-const fs = require('fs');
+const { broadcastJobProgress } = require('../websocket/ws-handler');
 
-const tempDir = path.join(__dirname, '..', '..', 'temp');
-
-// Helper: send file response
-const sendFile = (res, filePath, filename) => {
-  res.download(filePath, filename, (err) => {
-    if (err) console.error('Download error:', err);
-  });
-};
-
-const sendJson = (res, data) => {
-  res.json({ success: true, ...data });
+const handleResult = (res, result, filename) => {
+  if (result.path) return res.download(result.path, filename);
+  return res.json({ success: true, ...result });
 };
 
 exports.merge = async (req, res, next) => {
   try {
-    if (!req.files || req.files.length < 2) {
-      return res.status(400).json({ error: 'At least 2 PDF files required' });
-    }
-    const filePaths = req.files.map(f => f.path);
-    const outputPath = await pdfService.mergePDFs(filePaths);
-    sendFile(res, outputPath, 'merged.pdf');
+    if (!req.files || req.files.length < 2) return res.status(400).json({ error: 'At least 2 PDF files required' });
+    const result = await pdfService.mergePDFs(req.files.map(f => f.path), req.body);
+    handleResult(res, result, 'merged.pdf');
   } catch (err) { next(err); }
 };
 
 exports.split = async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'PDF file required' });
-    const { ranges } = req.body; // e.g. "1-3,5,7-10"
-    const outputPath = await pdfService.splitPDF(req.file.path, ranges);
-    sendFile(res, outputPath, 'split.zip');
+    const { ranges, mode } = req.body;
+    const result = await pdfService.splitPDF(req.file.path, ranges, mode);
+    handleResult(res, result, 'split.zip');
   } catch (err) { next(err); }
 };
 
 exports.compress = async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'PDF file required' });
-    const { quality } = req.body; // low, medium, high
-    const outputPath = await pdfService.compressPDF(req.file.path, quality || 'medium');
-    sendFile(res, outputPath, 'compressed.pdf');
+    const result = await pdfService.compressPDF(req.file.path, req.body.quality);
+    handleResult(res, result, 'compressed.pdf');
   } catch (err) { next(err); }
 };
 
 exports.rotate = async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'PDF file required' });
-    const { angle, pages } = req.body; // angle: 90, 180, 270; pages: "all" or "1,3,5"
-    const outputPath = await pdfService.rotatePDF(req.file.path, parseInt(angle) || 90, pages || 'all');
-    sendFile(res, outputPath, 'rotated.pdf');
+    const result = await pdfService.rotatePDF(req.file.path, parseInt(req.body.angle) || 90, req.body.pages || 'all');
+    handleResult(res, result, 'rotated.pdf');
   } catch (err) { next(err); }
 };
 
 exports.watermark = async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'PDF file required' });
-    const { text, opacity, position, fontSize } = req.body;
-    const outputPath = await pdfService.addWatermark(req.file.path, {
-      text: text || 'WATERMARK',
-      opacity: parseFloat(opacity) || 0.3,
-      position: position || 'center',
-      fontSize: parseInt(fontSize) || 50
-    });
-    sendFile(res, outputPath, 'watermarked.pdf');
+    const result = await pdfService.addWatermark(req.file.path, req.body);
+    handleResult(res, result, 'watermarked.pdf');
   } catch (err) { next(err); }
 };
 
 exports.protect = async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'PDF file required' });
-    const { password } = req.body;
-    if (!password) return res.status(400).json({ error: 'Password required' });
-    const outputPath = await pdfService.protectPDF(req.file.path, password);
-    sendFile(res, outputPath, 'protected.pdf');
+    if (!req.body.password) return res.status(400).json({ error: 'Password required' });
+    const result = await pdfService.protectPDF(req.file.path, req.body.password, req.body.ownerPassword);
+    handleResult(res, result, 'protected.pdf');
   } catch (err) { next(err); }
 };
 
-exports.unlock = async (req, res, next) => {
+exports.addPageNumbers = async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'PDF file required' });
-    const { password } = req.body;
-    const outputPath = await pdfService.unlockPDF(req.file.path, password);
-    sendFile(res, outputPath, 'unlocked.pdf');
+    const result = await pdfService.addPageNumbers(req.file.path, req.body);
+    handleResult(res, result, 'numbered.pdf');
   } catch (err) { next(err); }
 };
 
-exports.imagesToPdf = async (req, res, next) => {
-  try {
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ error: 'At least 1 image file required' });
-    }
-    const filePaths = req.files.map(f => f.path);
-    const { pageSize, margin } = req.body;
-    const outputPath = await pdfService.imagesToPDF(filePaths, { pageSize, margin });
-    sendFile(res, outputPath, 'images-to-pdf.pdf');
-  } catch (err) { next(err); }
-};
-
-exports.pdfToImages = async (req, res, next) => {
+exports.removePages = async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'PDF file required' });
-    const { format, dpi } = req.body;
-    const outputPath = await pdfService.pdfToImages(req.file.path, {
-      format: format || 'png',
-      dpi: parseInt(dpi) || 150
-    });
-    sendFile(res, outputPath, 'pdf-images.zip');
+    if (!req.body.pages) return res.status(400).json({ error: 'Pages to remove required' });
+    const result = await pdfService.removePages(req.file.path, req.body.pages);
+    handleResult(res, result, 'pages-removed.pdf');
+  } catch (err) { next(err); }
+};
+
+exports.reorderPages = async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'PDF file required' });
+    if (!req.body.order) return res.status(400).json({ error: 'New order required' });
+    const result = await pdfService.reorderPages(req.file.path, req.body.order);
+    handleResult(res, result, 'reordered.pdf');
+  } catch (err) { next(err); }
+};
+
+exports.extractPages = async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'PDF file required' });
+    if (!req.body.pages) return res.status(400).json({ error: 'Pages to extract required' });
+    const result = await pdfService.extractPages(req.file.path, req.body.pages);
+    handleResult(res, result, 'extracted.pdf');
   } catch (err) { next(err); }
 };
 
@@ -114,73 +95,39 @@ exports.extractText = async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'PDF file required' });
     const result = await pdfService.extractText(req.file.path);
-    sendJson(res, { text: result.text, pages: result.numpages, info: result.info });
-  } catch (err) { next(err); }
-};
-
-exports.addPageNumbers = async (req, res, next) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: 'PDF file required' });
-    const { position, startFrom, format } = req.body;
-    const outputPath = await pdfService.addPageNumbers(req.file.path, {
-      position: position || 'bottom-center',
-      startFrom: parseInt(startFrom) || 1,
-      format: format || 'numeric'
-    });
-    sendFile(res, outputPath, 'numbered.pdf');
-  } catch (err) { next(err); }
-};
-
-exports.removePages = async (req, res, next) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: 'PDF file required' });
-    const { pages } = req.body; // e.g. "1,3,5-7"
-    if (!pages) return res.status(400).json({ error: 'Pages to remove required' });
-    const outputPath = await pdfService.removePages(req.file.path, pages);
-    sendFile(res, outputPath, 'pages-removed.pdf');
-  } catch (err) { next(err); }
-};
-
-exports.reorderPages = async (req, res, next) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: 'PDF file required' });
-    const { order } = req.body; // e.g. "3,1,2,5,4"
-    if (!order) return res.status(400).json({ error: 'Page order required' });
-    const outputPath = await pdfService.reorderPages(req.file.path, order);
-    sendFile(res, outputPath, 'reordered.pdf');
+    res.json({ success: true, ...result });
   } catch (err) { next(err); }
 };
 
 exports.getMetadata = async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'PDF file required' });
-    const metadata = await pdfService.getMetadata(req.file.path);
-    sendJson(res, { metadata });
+    const result = await pdfService.getMetadata(req.file.path);
+    res.json({ success: true, metadata: result });
   } catch (err) { next(err); }
 };
 
 exports.editMetadata = async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'PDF file required' });
-    const { title, author, subject, keywords } = req.body;
-    const outputPath = await pdfService.editMetadata(req.file.path, { title, author, subject, keywords });
-    sendFile(res, outputPath, 'metadata-edited.pdf');
+    const result = await pdfService.editMetadata(req.file.path, req.body);
+    handleResult(res, result, 'metadata-edited.pdf');
   } catch (err) { next(err); }
 };
 
 exports.flatten = async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'PDF file required' });
-    const outputPath = await pdfService.flattenPDF(req.file.path);
-    sendFile(res, outputPath, 'flattened.pdf');
+    const result = await pdfService.flattenPDF(req.file.path);
+    handleResult(res, result, 'flattened.pdf');
   } catch (err) { next(err); }
 };
 
-exports.grayscale = async (req, res, next) => {
+exports.repair = async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'PDF file required' });
-    const outputPath = await pdfService.grayscalePDF(req.file.path);
-    sendFile(res, outputPath, 'grayscale.pdf');
+    const result = await pdfService.repairPDF(req.file.path);
+    handleResult(res, result, 'repaired.pdf');
   } catch (err) { next(err); }
 };
 
@@ -189,20 +136,23 @@ exports.sign = async (req, res, next) => {
     if (!req.files || !req.files.file || !req.files.signature) {
       return res.status(400).json({ error: 'PDF file and signature image required' });
     }
-    const { page, x, y, width, height } = req.body;
-    const outputPath = await pdfService.signPDF(
-      req.files.file[0].path,
-      req.files.signature[0].path,
-      { page: parseInt(page) || 1, x: parseInt(x) || 100, y: parseInt(y) || 100, width: parseInt(width) || 200, height: parseInt(height) || 80 }
-    );
-    sendFile(res, outputPath, 'signed.pdf');
+    const result = await pdfService.signPDF(req.files.file[0].path, req.files.signature[0].path, req.body);
+    handleResult(res, result, 'signed.pdf');
   } catch (err) { next(err); }
 };
 
-exports.repair = async (req, res, next) => {
+exports.addHeaderFooter = async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'PDF file required' });
-    const outputPath = await pdfService.repairPDF(req.file.path);
-    sendFile(res, outputPath, 'repaired.pdf');
+    const result = await pdfService.addHeaderFooter(req.file.path, req.body);
+    handleResult(res, result, 'header-footer.pdf');
+  } catch (err) { next(err); }
+};
+
+exports.resizePages = async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'PDF file required' });
+    const result = await pdfService.resizePages(req.file.path, req.body.targetSize);
+    handleResult(res, result, 'resized.pdf');
   } catch (err) { next(err); }
 };
