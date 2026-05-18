@@ -1,0 +1,45 @@
+{
+  "name": "pro-planner-generator",
+  "version": "1.0.0",
+  "description": "Professional planner generator tool for creating printable PDF planners to sell on Etsy and Gumroad",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "generate": "node index.js",
+    "generate:all": "node index.js --type all",
+    "generate:daily": "node index.js --type daily",
+    "generate:weekly": "node index.js --type weekly",
+    "generate:monthly": "node index.js --type monthly",
+    "generate:yearly": "node index.js --type yearly",
+    "generate:budget": "node index.js --type budget",
+    "generate:fitness": "node index.js --type fitness",
+    "generate:meal": "node index.js --type meal",
+    "generate:project": "node index.js --type project",
+    "generate:habit": "node index.js --type habit",
+    "generate:goal": "node index.js --type goal",
+    "generate:student": "node index.js --type student",
+    "generate:wedding": "node index.js --type wedding",
+    "generate:travel": "node index.js --type travel",
+    "generate:business": "node index.js --type business",
+    "generate:selfcare": "node index.js --type selfcare"
+  },
+  "keywords": [
+    "planner",
+    "pdf",
+    "etsy",
+    "gumroad",
+    "printable",
+    "digital-product",
+    "generator"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "pdfkit": "^0.13.0",
+    "commander": "^11.1.0",
+    "chalk": "^5.3.0",
+    "inquirer": "^9.2.12",
+    "ora": "^7.0.1"
+  }
+}
