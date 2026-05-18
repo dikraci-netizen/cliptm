@@ -5,7 +5,9 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "node index.js",
+    "start": "node server.js",
+    "server": "node server.js",
+    "cli": "node index.js",
     "generate": "node index.js",
     "generate:all": "node index.js --type all",
     "generate:daily": "node index.js --type daily",
