@@ -1,7 +1,7 @@
 {
   "name": "pro-planner-generator",
-  "version": "1.0.0",
-  "description": "Professional planner generator tool for creating printable PDF planners to sell on Etsy and Gumroad",
+  "version": "2.0.0",
+  "description": "Zero-dependency professional planner generator for creating printable PDF planners to sell on Etsy and Gumroad",
   "main": "index.js",
   "type": "module",
   "scripts": {
@@ -31,15 +31,10 @@
     "gumroad",
     "printable",
     "digital-product",
-    "generator"
+    "generator",
+    "zero-dependency"
   ],
   "author": "",
   "license": "MIT",
-  "dependencies": {
-    "pdfkit": "^0.13.0",
-    "commander": "^11.1.0",
-    "chalk": "^5.3.0",
-    "inquirer": "^9.2.12",
-    "ora": "^7.0.1"
-  }
+  "dependencies": {}
 }

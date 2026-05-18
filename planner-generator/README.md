@@ -1,6 +1,26 @@
-# Pro Planner Generator
+# Pro Planner Generator v2.0
 
-A professional PDF planner generator tool designed for creating high-quality, printable planners to sell on **Etsy** and **Gumroad**.
+A **zero-dependency** professional PDF planner generator tool designed for creating high-quality, printable planners to sell on **Etsy** and **Gumroad**.
+
+> **No `npm install` needed!** This tool uses only Node.js built-in modules with a custom PDF generation engine.
+
+## Quick Start
+
+```bash
+cd planner-generator
+
+# Generate a daily planner
+node index.js --type daily
+
+# Generate ALL 15 planners at once
+node index.js --type all
+
+# See all available options
+node index.js --help
+
+# List all planner types, themes, and sizes
+node index.js --list
+```
 
 ## Features
 
@@ -39,32 +59,7 @@ A professional PDF planner generator tool designed for creating high-quality, pr
 - A5
 - Half Letter (5.5 x 8.5")
 
-## Installation
-
-```bash
-cd planner-generator
-npm install
-```
-
 ## Usage
-
-### Quick Generate
-```bash
-# Generate a specific planner
-node index.js --type daily --theme minimalist --size letter
-
-# Generate all planners at once
-node index.js --type all
-
-# Generate in all themes (great for bundles!)
-node index.js --type weekly --all-themes
-
-# Generate in all paper sizes
-node index.js --type budget --all-sizes
-
-# Interactive mode (guided setup)
-node index.js --interactive
-```
 
 ### CLI Options
 ```
@@ -74,12 +69,35 @@ node index.js --interactive
 -p, --pages <number>    Override default page count
 -o, --output <dir>      Output directory (default: ./output)
 -y, --year <year>       Year for dated planners
--i, --interactive       Launch interactive selection mode
 --all-themes            Generate in all 8 themes
 --all-sizes             Generate in all 4 paper sizes
+-l, --list              List all available options
+-h, --help              Show help
 ```
 
-### NPM Scripts
+### Examples
+
+```bash
+# Single planner with specific theme and size
+node index.js --type weekly --theme elegant --size a4
+
+# Generate a planner in ALL 8 themes (perfect for Etsy bundles!)
+node index.js --type budget --all-themes
+
+# Generate in ALL paper sizes
+node index.js --type daily --all-sizes
+
+# Set a specific year for dated planners
+node index.js --type monthly --year 2026
+
+# Custom page count
+node index.js --type fitness --pages 52
+
+# Generate everything in one go
+node index.js --type all
+```
+
+### NPM Scripts (convenience)
 ```bash
 npm run generate:daily
 npm run generate:weekly
@@ -121,23 +139,58 @@ npm run generate:all
 4. **Life Events Bundle**: Wedding + Travel + Student
 5. **Complete Collection**: All 15 planners in all themes
 
-## Output
+## Technical Details
 
-Generated PDFs are saved in the `./output` directory with filenames like:
-```
-daily-planner-minimalist-1703001234567.pdf
-weekly-planner-elegant-letter.pdf
-```
+### Zero Dependencies
+This tool implements a custom **PDF 1.4** writer using only Node.js built-in modules:
+- `fs` - File system operations
+- `path` - Path handling
+- `node:util` - CLI argument parsing
 
-## Customization
+No npm packages required. No `node_modules` folder. Just clone and run.
+
+### Architecture
+```
+planner-generator/
+├── index.js              # CLI entry point
+├── src/
+│   ├── generator.js      # Main generator orchestrator
+│   ├── pdf-engine.js     # Pure PDF 1.4 writer (zero dependencies)
+│   ├── themes.js         # 8 professional color themes
+│   └── templates/
+│       ├── index.js      # Template registry
+│       ├── daily.js      # Daily planner layout
+│       ├── weekly.js     # Weekly planner layout
+│       ├── monthly.js    # Monthly planner layout
+│       ├── yearly.js     # Yearly planner layout
+│       ├── budget.js     # Budget/finance layout
+│       ├── fitness.js    # Fitness tracker layout
+│       ├── meal.js       # Meal planner layout
+│       ├── project.js    # Project management layout
+│       ├── habit.js      # Habit tracker layout
+│       ├── goal.js       # Goal setting layout
+│       ├── student.js    # Student/academic layout
+│       ├── wedding.js    # Wedding planner layout
+│       ├── travel.js     # Travel planner layout
+│       ├── business.js   # Business planner layout
+│       └── selfcare.js   # Self-care/wellness layout
+├── output/               # Generated PDFs (gitignored)
+├── package.json
+└── README.md
+```
 
 ### Adding New Templates
 1. Create a new file in `src/templates/`
-2. Export a `generate` function and `meta` object
+2. Export a `generate(engine, options)` function and a `meta` object
 3. Register it in `src/templates/index.js`
 
 ### Adding New Themes
 Add a new theme object in `src/themes.js` following the existing structure.
+
+## Requirements
+
+- Node.js 18+ (uses `node:util` parseArgs)
+- No other dependencies needed!
 
 ## License
 

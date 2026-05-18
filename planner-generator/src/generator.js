@@ -29,7 +29,7 @@ export class PlannerGenerator {
     const filename = options.filename || `${type}-planner-${this.theme.name.toLowerCase()}-${Date.now()}.pdf`;
     const outputPath = `${this.outputDir}/${filename}`;
 
-    const streamPromise = engine.createDocument(outputPath);
+    engine.createDocument(outputPath);
 
     // Draw cover page
     engine.drawCoverPage(
@@ -46,9 +46,8 @@ export class PlannerGenerator {
       ...options
     });
 
-    // Finalize
+    // Finalize and write to disk
     engine.finalize();
-    await streamPromise;
 
     return {
       path: outputPath,
