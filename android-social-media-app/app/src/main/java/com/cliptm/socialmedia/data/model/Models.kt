@@ -3,11 +3,55 @@ package com.cliptm.socialmedia.data.model
 /**
  * Supported languages for content generation
  */
-enum class Language(val displayName: String, val code: String, val nativeName: String) {
+enum class Language(val displayName: String, val code: String, val nativeName: String, val isRtl: Boolean = false) {
+    // Core languages
     ENGLISH("English", "en", "English"),
     FRENCH("Français", "fr", "Français"),
-    ARABIC_MSA("Arabic (MSA)", "ar", "العربية الفصحى"),
-    DARIJA("Moroccan Darija", "darija", "الدارجة المغربية")
+    ARABIC_MSA("Arabic (MSA)", "ar", "العربية الفصحى", true),
+    DARIJA("Moroccan Darija", "darija", "الدارجة المغربية", true),
+
+    // European languages
+    SPANISH("Español", "es", "Español"),
+    PORTUGUESE("Português", "pt", "Português"),
+    ITALIAN("Italiano", "it", "Italiano"),
+    GERMAN("Deutsch", "de", "Deutsch"),
+    DUTCH("Nederlands", "nl", "Nederlands"),
+    POLISH("Polski", "pl", "Polski"),
+    ROMANIAN("Română", "ro", "Română"),
+    GREEK("Ελληνικά", "el", "Ελληνικά"),
+    SWEDISH("Svenska", "sv", "Svenska"),
+    RUSSIAN("Русский", "ru", "Русский"),
+    UKRAINIAN("Українська", "uk", "Українська"),
+
+    // Asian languages
+    CHINESE_SIMPLIFIED("中文 (简体)", "zh-CN", "简体中文"),
+    CHINESE_TRADITIONAL("中文 (繁體)", "zh-TW", "繁體中文"),
+    JAPANESE("日本語", "ja", "日本語"),
+    KOREAN("한국어", "ko", "한국어"),
+    HINDI("हिन्दी", "hi", "हिन्दी"),
+    BENGALI("বাংলা", "bn", "বাংলা"),
+    URDU("اردو", "ur", "اردو", true),
+    THAI("ไทย", "th", "ภาษาไทย"),
+    VIETNAMESE("Tiếng Việt", "vi", "Tiếng Việt"),
+    INDONESIAN("Bahasa Indonesia", "id", "Bahasa Indonesia"),
+    MALAY("Bahasa Melayu", "ms", "Bahasa Melayu"),
+    FILIPINO("Filipino", "fil", "Filipino"),
+
+    // Middle East & Africa
+    TURKISH("Türkçe", "tr", "Türkçe"),
+    PERSIAN("فارسی", "fa", "فارسی", true),
+    HEBREW("עברית", "he", "עברית", true),
+    SWAHILI("Kiswahili", "sw", "Kiswahili"),
+    AMHARIC("አማርኛ", "am", "አማርኛ"),
+    HAUSA("Hausa", "ha", "Hausa"),
+    YORUBA("Yorùbá", "yo", "Yorùbá"),
+
+    // Arabic dialects
+    EGYPTIAN_ARABIC("Egyptian Arabic", "ar-EG", "المصرية", true),
+    GULF_ARABIC("Gulf Arabic", "ar-AE", "الخليجية", true),
+    LEVANTINE_ARABIC("Levantine Arabic", "ar-LB", "الشامية", true),
+    TUNISIAN_ARABIC("Tunisian Arabic", "ar-TN", "التونسية", true),
+    ALGERIAN_ARABIC("Algerian Arabic", "ar-DZ", "الجزائرية", true)
 }
 
 /**
