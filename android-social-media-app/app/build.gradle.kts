@@ -97,8 +97,25 @@ dependencies {
     // DataStore for preferences
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 
+    // Room Database
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    kapt("androidx.room:room-compiler:2.6.1")
+
+    // WorkManager for background tasks
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+
+    // Biometric Authentication
+    implementation("androidx.biometric:biometric:1.1.0")
+
+    // Pager (for onboarding)
+    implementation("androidx.compose.foundation:foundation:1.6.0")
+
     // Gson
     implementation("com.google.code.gson:gson:2.10.1")
+
+    // Coil for image loading
+    implementation("io.coil-kt:coil-compose:2.5.0")
 
     // Debug
     debugImplementation("androidx.compose.ui:ui-tooling")
