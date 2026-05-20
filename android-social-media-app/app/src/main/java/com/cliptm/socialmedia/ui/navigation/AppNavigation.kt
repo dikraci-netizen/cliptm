@@ -6,6 +6,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.cliptm.socialmedia.ui.screens.ChatScreen
 import com.cliptm.socialmedia.ui.screens.HomeScreen
+import com.cliptm.socialmedia.ui.screens.ProvidersScreen
 import com.cliptm.socialmedia.ui.screens.SettingsScreen
 
 @Composable
@@ -16,7 +17,8 @@ fun AppNavigation() {
         composable("home") {
             HomeScreen(
                 onNavigateToChat = { navController.navigate("chat") },
-                onNavigateToSettings = { navController.navigate("settings") }
+                onNavigateToSettings = { navController.navigate("settings") },
+                onNavigateToProviders = { navController.navigate("providers") }
             )
         }
         composable("chat") {
@@ -24,6 +26,9 @@ fun AppNavigation() {
         }
         composable("settings") {
             SettingsScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        composable("providers") {
+            ProvidersScreen(onNavigateBack = { navController.popBackStack() })
         }
     }
 }

@@ -32,7 +32,8 @@ data class QuickAction(
 @Composable
 fun HomeScreen(
     onNavigateToChat: () -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToProviders: () -> Unit = {}
 ) {
     val quickActions = listOf(
         QuickAction("Post", "Créer un post", Icons.Default.Edit, Color(0xFF6C63FF)),
@@ -60,6 +61,9 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onNavigateToProviders) {
+                        Icon(Icons.Default.Api, contentDescription = "Providers")
+                    }
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
