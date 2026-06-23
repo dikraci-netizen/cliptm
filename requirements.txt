@@ -1,0 +1,1 @@
+# No external runtime dependencies are required; the scraper uses only the Python standard library.
